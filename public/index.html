@@ -1,0 +1,1016 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>德州扑克 - 多人在线</title>
+    <meta property="og:title" content="德州扑克 - 来玩一局！">
+    <meta property="og:description" content="德州扑克多人在线对战，快来加入！">
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=Noto+Sans+SC:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        :root {
+            --felt-green: #0d5c2e;
+            --felt-dark: #0a4a24;
+            --rail-wood: #5c3d2e;
+            --rail-dark: #3d2820;
+            --gold-accent: #d4af37;
+            --card-white: #f8f6f0;
+            --card-back: #1a3a5c;
+            --text-light: #e8e4dc;
+            --text-gold: #ffd700;
+        }
+
+        body {
+            font-family: 'Noto Sans SC', sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            min-height: 100vh;
+            overflow-x: hidden;
+            color: var(--text-light);
+        }
+
+        .screen { display: none; min-height: 100vh; padding: 20px; }
+        .screen.active { display: flex; flex-direction: column; align-items: center; justify-content: center; }
+
+        .lobby-container { text-align: center; max-width: 500px; width: 100%; }
+
+        .logo {
+            font-family: 'Cinzel', serif;
+            font-size: 3rem;
+            font-weight: 700;
+            color: var(--text-gold);
+            text-shadow: 0 4px 20px rgba(212, 175, 55, 0.4);
+            margin-bottom: 10px;
+            letter-spacing: 4px;
+        }
+
+        .subtitle { font-size: 1.2rem; color: rgba(255, 255, 255, 0.7); margin-bottom: 40px; letter-spacing: 2px; }
+
+        .menu-card {
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 20px;
+            padding: 35px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            margin-bottom: 25px;
+        }
+
+        .menu-title { font-size: 1.3rem; margin-bottom: 25px; color: var(--text-light); }
+
+        .player-name-input {
+            width: 100%;
+            padding: 15px 20px;
+            font-size: 1.1rem;
+            border: 2px solid rgba(255, 255, 255, 0.2);
+            border-radius: 12px;
+            background: rgba(0, 0, 0, 0.3);
+            color: white;
+            margin-bottom: 20px;
+            text-align: center;
+            transition: all 0.3s ease;
+        }
+
+        .player-name-input:focus { outline: none; border-color: var(--gold-accent); box-shadow: 0 0 20px rgba(212, 175, 55, 0.3); }
+        .player-name-input::placeholder { color: rgba(255, 255, 255, 0.5); }
+
+        .chip-options { display: flex; gap: 15px; justify-content: center; margin-bottom: 25px; }
+
+        .chip-option {
+            padding: 12px 25px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 700;
+            border: 2px solid transparent;
+            transition: all 0.3s;
+        }
+
+        .chip-option.chip-1000 { background: linear-gradient(145deg, #e74c3c, #c0392b); color: white; }
+        .chip-option.chip-2000 { background: linear-gradient(145deg, #3498db, #2980b9); color: white; }
+        .chip-option:hover { transform: scale(1.05); }
+        .chip-option.selected { border-color: var(--gold-accent); transform: scale(1.1); }
+
+        .btn {
+            width: 100%;
+            padding: 16px 30px;
+            font-size: 1.1rem;
+            font-weight: 700;
+            border: none;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-family: 'Noto Sans SC', sans-serif;
+        }
+
+        .btn-primary {
+            background: linear-gradient(145deg, var(--gold-accent), #b8962e);
+            color: #1a1a2e;
+        }
+
+        .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 10px 30px rgba(212, 175, 55, 0.4); }
+
+        .btn-secondary {
+            background: linear-gradient(145deg, #27ae60, #1e8449);
+            color: white;
+        }
+
+        .btn-secondary:hover { transform: translateY(-2px); box-shadow: 0 10px 30px rgba(39, 174, 96, 0.4); }
+
+        .room-info {
+            background: rgba(0, 0, 0, 0.4);
+            border-radius: 12px;
+            padding: 15px 20px;
+            margin: 20px 0;
+            display: none;
+        }
+
+        .room-info.active { display: block; }
+
+        .room-id {
+            font-family: 'Cinzel', serif;
+            font-size: 1.5rem;
+            color: var(--text-gold);
+            letter-spacing: 3px;
+            margin-bottom: 10px;
+        }
+
+        .share-section { display: flex; gap: 10px; align-items: center; justify-content: center; flex-wrap: wrap; }
+
+        .share-link {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 10px 15px;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            max-width: 200px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .copy-btn {
+            padding: 10px 20px;
+            background: #3498db;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+
+        .copy-btn:hover { background: #2980b9; }
+        .copy-btn.copied { background: #27ae60; }
+
+        .players-list {
+            margin-top: 20px;
+            text-align: left;
+        }
+
+        .players-list h3 { font-size: 1rem; margin-bottom: 10px; color: rgba(255, 255, 255, 0.8); }
+
+        .player-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 8px 12px;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 8px;
+            margin-bottom: 5px;
+        }
+
+        .player-item .name { flex: 1; }
+        .player-item .chips { color: var(--text-gold); font-weight: 600; }
+        .player-item .host-badge {
+            background: var(--gold-accent);
+            color: #1a1a2e;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 0.7rem;
+            font-weight: 700;
+        }
+
+        /* 游戏界面 */
+        .game-container { width: 100%; max-width: 900px; margin: 0 auto; display: flex; flex-direction: column; min-height: 100vh; padding: 15px; }
+
+        .table-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 20px;
+            background: rgba(0, 0, 0, 0.4);
+            border-radius: 12px;
+            margin-bottom: 15px;
+        }
+
+        .table-info { font-family: 'Cinzel', serif; font-size: 1.1rem; color: var(--gold-accent); }
+        .player-balance { display: flex; align-items: center; gap: 10px; }
+        .balance-label { color: rgba(255, 255, 255, 0.7); }
+        .balance-amount { font-size: 1.3rem; font-weight: 700; color: var(--text-gold); }
+
+        .game-status {
+            text-align: center;
+            padding: 12px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: var(--gold-accent);
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 10px;
+            margin-bottom: 15px;
+        }
+
+        .game-table {
+            flex: 1;
+            background: radial-gradient(ellipse at center, var(--felt-green) 0%, var(--felt-dark) 100%);
+            border-radius: 50%;
+            border: 15px solid var(--rail-wood);
+            box-shadow: 0 0 0 5px var(--rail-dark), 0 20px 60px rgba(0, 0, 0, 0.5),
+                        inset 0 0 100px rgba(0, 0, 0, 0.2);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 40px 20px;
+            min-height: 350px;
+            position: relative;
+        }
+
+        /* 牌桌布局 */
+        .table-layout { display: flex; flex-direction: column; align-items: center; gap: 20px; width: 100%; }
+
+        .players-top { display: flex; justify-content: center; gap: 30px; }
+
+        .seat {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+            padding: 12px 20px;
+            background: rgba(0, 0, 0, 0.5);
+            border-radius: 12px;
+            border: 2px solid rgba(255, 255, 255, 0.1);
+            min-width: 120px;
+            position: relative;
+            transition: all 0.3s;
+        }
+
+        .seat.active-turn { border-color: var(--gold-accent); box-shadow: 0 0 20px rgba(212, 175, 55, 0.5); }
+
+        .seat.is-dealer::before {
+            content: 'D';
+            position: absolute;
+            top: -8px;
+            left: -8px;
+            width: 24px;
+            height: 24px;
+            background: var(--gold-accent);
+            color: #1a1a2e;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.7rem;
+            font-weight: 700;
+        }
+
+        .seat-name { font-weight: 600; font-size: 0.95rem; }
+        .seat-chips { font-size: 1rem; font-weight: 700; color: var(--text-gold); }
+        .seat-cards { display: flex; gap: 4px; min-height: 40px; }
+
+        .community-area { display: flex; flex-direction: column; align-items: center; gap: 10px; }
+        .community-label { font-family: 'Cinzel', serif; font-size: 0.85rem; color: rgba(255, 255, 255, 0.6); letter-spacing: 2px; }
+        .community-cards { display: flex; gap: 10px; justify-content: center; }
+
+        .pot-area {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 25px;
+            background: rgba(0, 0, 0, 0.5);
+            border-radius: 30px;
+            border: 2px solid var(--gold-accent);
+        }
+
+        .pot-label { font-size: 0.9rem; color: rgba(255, 255, 255, 0.7); }
+        .pot-amount { font-size: 1.4rem; font-weight: 700; color: var(--text-gold); font-family: 'Cinzel', serif; }
+
+        .player-hand-area {
+            margin-top: 20px;
+            padding: 20px;
+            background: rgba(0, 0, 0, 0.5);
+            border-radius: 16px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .hand-label { font-family: 'Cinzel', serif; font-size: 0.9rem; color: rgba(255, 255, 255, 0.6); letter-spacing: 2px; }
+        .hand-cards { display: flex; gap: 12px; }
+        .hand-cards .card { width: 70px; height: 100px; }
+
+        .card {
+            width: 55px;
+            height: 80px;
+            border-radius: 6px;
+            position: relative;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4);
+        }
+
+        .card.face-down {
+            background: linear-gradient(145deg, var(--card-back), #0f2840);
+            border: 2px solid #2a5a8c;
+        }
+
+        .card.face-down::before {
+            content: '♠♥♦♣';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 0.6rem;
+            color: rgba(255, 255, 255, 0.2);
+            letter-spacing: 1px;
+        }
+
+        .card.red, .card.black { background: linear-gradient(145deg, var(--card-white), #e8e4dc); }
+
+        .card-corner { position: absolute; font-family: 'Cinzel', serif; font-weight: 700; font-size: 0.75rem; line-height: 1; }
+        .card-corner.top { top: 4px; left: 6px; }
+        .card-corner.bottom { bottom: 4px; right: 6px; transform: rotate(180deg); }
+        .card-suit { font-size: 0.9rem; }
+        .card.red .card-corner { color: #c41e3a; }
+        .card.black .card-corner { color: #1a1a1a; }
+        .card-center { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 1.5rem; }
+        .card.hidden { visibility: hidden; }
+
+        /* 操作区域 */
+        .action-area { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin-top: 15px; }
+
+        .action-btn {
+            padding: 14px 24px;
+            font-size: 1rem;
+            font-weight: 700;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-family: 'Noto Sans SC', sans-serif;
+            min-width: 80px;
+        }
+
+        .action-btn.fold { background: linear-gradient(145deg, #95a5a6, #7f8c8d); color: white; }
+        .action-btn.call { background: linear-gradient(145deg, #3498db, #2980b9); color: white; }
+        .action-btn.raise { background: linear-gradient(145deg, #e74c3c, #c0392b); color: white; }
+        .action-btn.check { background: linear-gradient(145deg, #27ae60, #1e8449); color: white; }
+        .action-btn.all-in { background: linear-gradient(145deg, #9b59b6, #8e44ad); color: white; }
+        .action-btn.bet { background: linear-gradient(145deg, #f39c12, #d68910); color: white; }
+
+        .action-btn:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 5px 20px rgba(0, 0, 0, 0.3); }
+        .action-btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+
+        .bet-controls { display: flex; align-items: center; gap: 10px; }
+
+        .bet-input {
+            padding: 12px 15px;
+            font-size: 1rem;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-radius: 8px;
+            background: rgba(0, 0, 0, 0.3);
+            color: white;
+            width: 110px;
+            text-align: center;
+            font-family: 'Noto Sans SC', sans-serif;
+        }
+
+        .bet-input:focus { outline: none; border-color: var(--gold-accent); }
+
+        .quick-bet-buttons { display: flex; gap: 6px; margin-top: 8px; }
+
+        .quick-bet-btn {
+            padding: 6px 10px;
+            font-size: 0.8rem;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 6px;
+            color: white;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .quick-bet-btn:hover { background: rgba(255, 255, 255, 0.2); }
+
+        .info-panel { display: flex; gap: 15px; justify-content: center; flex-wrap: wrap; }
+
+        .info-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 15px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 8px;
+            font-size: 0.9rem;
+        }
+
+        .info-item .label { color: rgba(255, 255, 255, 0.6); }
+        .info-item .value { color: var(--text-gold); font-weight: 600; }
+
+        /* 等待区域 */
+        .waiting-section {
+            text-align: center;
+            padding: 30px;
+        }
+
+        .waiting-text {
+            font-size: 1.2rem;
+            color: rgba(255, 255, 255, 0.8);
+            margin-bottom: 20px;
+        }
+
+        /* 模态框 */
+        .modal-overlay { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, 0.85); z-index: 1000; align-items: center; justify-content: center; }
+        .modal-overlay.active { display: flex; }
+
+        .modal-content {
+            background: linear-gradient(145deg, #1a1a2e, #16213e);
+            border-radius: 20px;
+            padding: 35px;
+            text-align: center;
+            max-width: 400px;
+            border: 2px solid var(--gold-accent);
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+        }
+
+        .modal-title { font-family: 'Cinzel', serif; font-size: 1.8rem; color: var(--text-gold); margin-bottom: 15px; }
+        .modal-message { font-size: 1.1rem; color: var(--text-light); margin-bottom: 20px; line-height: 1.6; white-space: pre-line; }
+        .modal-btn {
+            padding: 14px 30px;
+            font-size: 1rem;
+            font-weight: 700;
+            background: linear-gradient(145deg, var(--gold-accent), #b8962e);
+            color: #1a1a2e;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-family: 'Noto Sans SC', sans-serif;
+        }
+
+        .modal-btn:hover { transform: scale(1.05); }
+
+        /* 动画 */
+        @keyframes cardDeal {
+            0% { transform: translateY(-100px) rotate(-20deg) scale(0.5); opacity: 0; }
+            100% { transform: translateY(0) rotate(0) scale(1); opacity: 1; }
+        }
+
+        .card.dealing { animation: cardDeal 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+
+        @media (max-width: 768px) {
+            .logo { font-size: 2rem; }
+            .seat { min-width: 90px; padding: 8px 12px; }
+            .card { width: 45px; height: 65px; }
+            .hand-cards .card { width: 55px; height: 80px; }
+            .action-btn { padding: 12px 16px; min-width: 65px; font-size: 0.9rem; }
+            .players-top { gap: 10px; flex-wrap: wrap; }
+        }
+    </style>
+</head>
+<body>
+    <!-- 大厅界面 -->
+    <div id="lobby-screen" class="screen active">
+        <div class="lobby-container">
+            <h1 class="logo">TEXAS HOLD'EM</h1>
+            <p class="subtitle">多人在线德州扑克</p>
+
+            <div class="menu-card">
+                <h2 class="menu-title">创建房间</h2>
+                <input type="text" id="player-name" class="player-name-input" placeholder="输入你的昵称" maxlength="12">
+                <div class="chip-options">
+                    <div class="chip-option chip-1000" onclick="selectChip(this, 1000)">1,000</div>
+                    <div class="chip-option chip-2000 selected" onclick="selectChip(this, 2000)">2,000</div>
+                </div>
+                <button class="btn btn-primary" onclick="createRoom()">创建房间</button>
+
+                <div class="room-info" id="room-info">
+                    <div class="room-id" id="room-id"></div>
+                    <div class="share-section">
+                        <div class="share-link" id="share-link"></div>
+                        <button class="copy-btn" onclick="copyShareLink()">复制链接</button>
+                    </div>
+                    <div class="players-list" id="players-list"></div>
+                    <button class="btn btn-secondary" id="start-game-btn" onclick="startGame()" style="margin-top: 20px; display: none;">
+                        开始游戏
+                    </button>
+                </div>
+            </div>
+
+            <div class="menu-card">
+                <h2 class="menu-title">加入房间</h2>
+                <input type="text" id="join-room-id" class="player-name-input" placeholder="输入房间号" maxlength="8" style="text-transform: uppercase;">
+                <button class="btn btn-secondary" onclick="joinRoom()">加入</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 游戏界面 -->
+    <div id="game-screen" class="screen">
+        <div class="game-container">
+            <div class="table-header">
+                <div class="table-info">♠♥ 德州扑克 ♦♣</div>
+                <div class="player-balance">
+                    <span class="balance-label">剩余:</span>
+                    <span class="balance-amount" id="player-balance">0</span>
+                </div>
+            </div>
+
+            <div class="game-status" id="game-status">等待开始...</div>
+
+            <div class="game-table">
+                <div class="table-layout">
+                    <div class="players-top" id="players-top"></div>
+
+                    <div class="community-area">
+                        <div class="community-label">公共牌</div>
+                        <div class="community-cards" id="community-cards">
+                            <div class="card face-down hidden"></div>
+                            <div class="card face-down hidden"></div>
+                            <div class="card face-down hidden"></div>
+                            <div class="card face-down hidden"></div>
+                            <div class="card face-down hidden"></div>
+                        </div>
+                    </div>
+
+                    <div class="pot-area">
+                        <span class="pot-label">底池:</span>
+                        <span class="pot-amount" id="pot-amount">0</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="player-hand-area" id="player-hand-area" style="display: none;">
+                <div class="hand-label">你的手牌</div>
+                <div class="hand-cards" id="player-hand">
+                    <div class="card face-down"></div>
+                    <div class="card face-down"></div>
+                </div>
+
+                <div class="info-panel">
+                    <div class="info-item">
+                        <span class="label">当前下注:</span>
+                        <span class="value" id="current-bet">0</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="label">需跟注:</span>
+                        <span class="value" id="to-call">0</span>
+                    </div>
+                </div>
+
+                <div class="action-area" id="action-area" style="display: none;">
+                    <button class="action-btn fold" onclick="playerAction('fold')">弃牌</button>
+                    <button class="action-btn check" id="check-btn" onclick="playerAction('check')" style="display:none">过牌</button>
+                    <button class="action-btn call" id="call-btn" onclick="playerAction('call')" style="display:none">跟注</button>
+                    <button class="action-btn bet" id="bet-btn" onclick="playerAction('bet')">下注</button>
+                    <div class="bet-controls">
+                        <input type="number" class="bet-input" id="bet-amount" min="0" placeholder="金额">
+                    </div>
+                    <button class="action-btn raise" id="raise-btn" onclick="playerAction('raise')" style="display:none">加注</button>
+                    <button class="action-btn all-in" onclick="playerAction('allin')">全下</button>
+                </div>
+
+                <div class="quick-bet-buttons" id="quick-bet-buttons" style="display:none;">
+                    <button class="quick-bet-btn" onclick="setQuickBet(0.5)">½ pot</button>
+                    <button class="quick-bet-btn" onclick="setQuickBet(1)">pot</button>
+                    <button class="quick-bet-btn" onclick="setQuickBet(1.5)">1½ pot</button>
+                    <button class="quick-bet-btn" onclick="setQuickBet(2)">2x pot</button>
+                </div>
+            </div>
+
+            <div class="waiting-section" id="waiting-section">
+                <p class="waiting-text">等待其他玩家加入...</p>
+                <div class="players-list" id="game-players-list"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 结果模态框 -->
+    <div class="modal-overlay" id="result-modal">
+        <div class="modal-content">
+            <h2 class="modal-title" id="modal-title">游戏结束</h2>
+            <p class="modal-message" id="modal-message"></p>
+            <button class="modal-btn" onclick="closeModal()">确定</button>
+        </div>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        const socket = io();
+
+        let game = {
+            playerId: null,
+            playerName: '',
+            roomId: null,
+            players: [],
+            myChips: 0,
+            isHost: false,
+            phase: 'waiting',
+            currentPlayer: 0
+        };
+
+        let selectedChips = 2000;
+
+        // 检查URL是否有room参数
+        const urlParams = new URLSearchParams(window.location.search);
+        const roomFromUrl = urlParams.get('room');
+
+        if (roomFromUrl) {
+            document.getElementById('join-room-id').value = roomFromUrl;
+        }
+
+        function selectChip(el, chips) {
+            document.querySelectorAll('.chip-option').forEach(e => e.classList.remove('selected'));
+            el.classList.add('selected');
+            selectedChips = chips;
+        }
+
+        function createRoom() {
+            const nameInput = document.getElementById('player-name');
+            const playerName = nameInput.value.trim() || '玩家' + Math.floor(Math.random() * 1000);
+
+            socket.emit('createRoom', {
+                playerName,
+                initialChips: selectedChips,
+                baseUrl: window.location.origin
+            }, (response) => {
+                if (response.success) {
+                    game.playerId = response.playerId;
+                    game.playerName = response.playerName;
+                    game.roomId = response.roomId;
+                    game.isHost = true;
+
+                    document.getElementById('room-id').textContent = `房间号: ${response.roomId}`;
+                    document.getElementById('share-link').textContent = response.shareUrl;
+                    document.getElementById('room-info').classList.add('active');
+                    document.querySelector('.menu-card:first-child .menu-title').textContent = '房间信息';
+
+                    updatePlayersList(response.roomId, []);
+                } else {
+                    alert('创建房间失败');
+                }
+            });
+        }
+
+        function joinRoom() {
+            const nameInput = document.getElementById('player-name');
+            const playerName = nameInput.value.trim() || '玩家' + Math.floor(Math.random() * 1000);
+            const roomId = document.getElementById('join-room-id').value.trim().toUpperCase();
+
+            if (!roomId) {
+                alert('请输入房间号');
+                return;
+            }
+
+            socket.emit('joinRoom', {
+                roomId,
+                playerName,
+                initialChips: selectedChips
+            }, (response) => {
+                if (response.success) {
+                    game.playerId = response.playerId;
+                    game.playerName = playerName;
+                    game.roomId = roomId;
+                    game.isHost = false;
+
+                    document.getElementById('lobby-screen').classList.remove('active');
+                    document.getElementById('game-screen').classList.add('active');
+
+                    updateGamePlayers(response.players);
+                } else {
+                    alert(response.error || '加入房间失败');
+                }
+            });
+        }
+
+        function copyShareLink() {
+            const link = document.getElementById('share-link').textContent;
+            navigator.clipboard.writeText(link).then(() => {
+                const btn = document.querySelector('.copy-btn');
+                btn.textContent = '已复制!';
+                btn.classList.add('copied');
+                setTimeout(() => {
+                    btn.textContent = '复制链接';
+                    btn.classList.remove('copied');
+                }, 2000);
+            });
+        }
+
+        function updatePlayersList(roomId, players) {
+            // 在大厅更新玩家列表
+        }
+
+        function startGame() {
+            socket.emit('startGame', {}, (response) => {
+                if (!response.success) {
+                    alert(response.error || '开始游戏失败');
+                }
+            });
+        }
+
+        // Socket事件
+        socket.on('playerJoined', (data) => {
+            if (game.roomId) {
+                updatePlayersList(game.roomId, data.players);
+                updateGamePlayers(data.players);
+            } else {
+                document.getElementById('players-list').innerHTML = data.players.map(p => `
+                    <div class="player-item">
+                        <span class="name">${p.name}</span>
+                        <span class="chips">${p.chips}</span>
+                    </div>
+                `).join('');
+
+                document.getElementById('start-game-btn').style.display = data.players.length >= 2 ? 'block' : 'none';
+            }
+        });
+
+        socket.on('gameStarted', (data) => {
+            document.getElementById('lobby-screen').classList.remove('active');
+            document.getElementById('game-screen').classList.add('active');
+
+            game.phase = 'preflop';
+            game.currentPlayer = data.currentPlayer;
+
+            updateGameState(data);
+        });
+
+        socket.on('playerAction', (data) => {
+            // 其他玩家操作
+        });
+
+        socket.on('gameUpdate', (data) => {
+            updateGameState(data);
+        });
+
+        socket.on('phaseAdvanced', (data) => {
+            game.phase = data.phase;
+            game.currentPlayer = data.currentPlayer;
+
+            document.getElementById('game-status').textContent = getPhaseName(data.phase);
+
+            const communityCards = document.querySelectorAll('#community-cards .card');
+            data.communityCards.forEach((card, i) => {
+                communityCards[i].className = `card ${card.suit === '♥' || card.suit === '♦' ? 'red' : 'black'} dealing`;
+                communityCards[i].innerHTML = `
+                    <div class="card-corner top">${card.rank}<br><span class="card-suit">${card.suit}</span></div>
+                    <div class="card-center card-suit">${card.suit}</div>
+                    <div class="card-corner bottom">${card.rank}<br><span class="card-suit">${card.suit}</span></div>
+                `;
+                communityCards[i].classList.remove('hidden');
+            });
+
+            enableActions();
+        });
+
+        socket.on('gameEnd', (data) => {
+            showModal(data.winner.name + ' 获胜!', `${data.handName}\n赢得底池: ${data.pot}`);
+        });
+
+        socket.on('gameOver', (data) => {
+            showModal('游戏结束', `${data.winner.name} 成为最终冠军！\n筹码: ${data.winner.chips}`);
+        });
+
+        socket.on('newHand', (data) => {
+            game.phase = 'preflop';
+            game.currentPlayer = data.currentPlayer;
+            updateGameState(data);
+        });
+
+        socket.on('playerLeft', (data) => {
+            alert(`${data.playerName} 离开了房间`);
+            updateGamePlayers();
+        });
+
+        socket.on('newHost', (data) => {
+            game.isHost = data.hostId === game.playerId;
+        });
+
+        function updateGameState(data) {
+            game.players = data.players;
+            game.currentPlayer = data.currentPlayer;
+
+            document.getElementById('pot-amount').textContent = data.pot.toLocaleString();
+
+            // 更新玩家信息
+            const playersTop = document.getElementById('players-top');
+            playersTop.innerHTML = '';
+
+            data.players.forEach((player, index) => {
+                const isMe = player.id === game.playerId;
+                const isActive = index === data.currentPlayer && game.phase !== 'waiting' && game.phase !== 'showdown';
+
+                const seat = document.createElement('div');
+                seat.className = `seat ${index === data.dealer ? 'is-dealer' : ''} ${isActive ? 'active-turn' : ''}`;
+
+                let cardsHtml = '';
+                if (player.hand && player.hand.length > 0) {
+                    if (isMe || game.phase === 'showdown') {
+                        cardsHtml = player.hand.map(c => `
+                            <div class="card ${c.suit === '♥' || c.suit === '♦' ? 'red' : 'black'}">
+                                <div class="card-corner top">${c.rank}<br><span class="card-suit">${c.suit}</span></div>
+                                <div class="card-center card-suit">${c.suit}</div>
+                                <div class="card-corner bottom">${c.rank}<br><span class="card-suit">${c.suit}</span></div>
+                            </div>
+                        `).join('');
+                    } else {
+                        cardsHtml = '<div class="card face-down"></div>'.repeat(player.hand.length);
+                    }
+                }
+
+                seat.innerHTML = `
+                    <div class="seat-name">${player.name}${isMe ? ' (你)' : ''}</div>
+                    <div class="seat-cards">${cardsHtml}</div>
+                    <div class="seat-chips">${player.chips.toLocaleString()}</div>
+                `;
+
+                playersTop.appendChild(seat);
+
+                if (isMe) {
+                    game.myChips = player.chips;
+                    document.getElementById('player-balance').textContent = player.chips.toLocaleString();
+
+                    // 更新手牌
+                    if (player.hand && player.hand.length > 0) {
+                        const handCards = document.querySelectorAll('#player-hand .card');
+                        player.hand.forEach((c, i) => {
+                            handCards[i].className = `card ${c.suit === '♥' || c.suit === '♦' ? 'red' : 'black'} dealing`;
+                            handCards[i].innerHTML = `
+                                <div class="card-corner top">${c.rank}<br><span class="card-suit">${c.suit}</span></div>
+                                <div class="card-center card-suit">${c.suit}</div>
+                                <div class="card-corner bottom">${c.rank}<br><span class="card-suit">${c.suit}</span></div>
+                            `;
+                        });
+                    }
+                }
+            });
+
+            // 更新公共牌
+            const communityCards = document.querySelectorAll('#community-cards .card');
+            communityCards.forEach((card, i) => {
+                if (i < data.communityCards.length) {
+                    const c = data.communityCards[i];
+                    card.className = `card ${c.suit === '♥' || c.suit === '♦' ? 'red' : 'black'} dealing`;
+                    card.innerHTML = `
+                        <div class="card-corner top">${c.rank}<br><span class="card-suit">${c.suit}</span></div>
+                        <div class="card-center card-suit">${c.suit}</div>
+                        <div class="card-corner bottom">${c.rank}<br><span class="card-suit">${c.suit}</span></div>
+                    `;
+                    card.classList.remove('hidden');
+                } else {
+                    card.className = 'card face-down hidden';
+                    card.innerHTML = '';
+                }
+            });
+
+            document.getElementById('game-status').textContent = getPhaseName(data.phase);
+
+            // 显示操作区域
+            document.getElementById('player-hand-area').style.display = 'block';
+            document.getElementById('waiting-section').style.display = 'none';
+
+            enableActions();
+        }
+
+        function updateGamePlayers(players) {
+            if (!players) return;
+
+            const list = document.getElementById('game-players-list');
+            if (list) {
+                list.innerHTML = players.map(p => `
+                    <div class="player-item">
+                        <span class="name">${p.name}${p.isHost ? '<span class="host-badge">房主</span>' : ''}</span>
+                        <span class="chips">${p.chips}</span>
+                    </div>
+                `).join('');
+            }
+        }
+
+        function enableActions() {
+            const myPlayerIndex = game.players.findIndex(p => p.id === game.playerId);
+            const isMyTurn = myPlayerIndex === game.currentPlayer;
+            const player = game.players[myPlayerIndex];
+
+            const actionsDiv = document.getElementById('action-area');
+            const callBtn = document.getElementById('call-btn');
+            const checkBtn = document.getElementById('check-btn');
+            const betBtn = document.getElementById('bet-btn');
+            const raiseBtn = document.getElementById('raise-btn');
+            const quickBetBtns = document.getElementById('quick-bet-buttons');
+            const betInput = document.getElementById('bet-amount');
+
+            callBtn.style.display = 'none';
+            checkBtn.style.display = 'none';
+            betBtn.style.display = 'none';
+            raiseBtn.style.display = 'none';
+            quickBetBtns.style.display = 'none';
+            actionsDiv.style.display = 'none';
+
+            if (!isMyTurn || player.folded || player.allIn || game.phase === 'waiting' || game.phase === 'showdown') {
+                return;
+            }
+
+            actionsDiv.style.display = 'flex';
+
+            const toCall = data.currentBet - player.currentBet;
+            document.getElementById('current-bet').textContent = player.currentBet;
+            document.getElementById('to-call').textContent = toCall;
+
+            if (toCall <= 0) {
+                checkBtn.style.display = 'block';
+                betBtn.style.display = 'block';
+                raiseBtn.style.display = 'block';
+                quickBetBtns.style.display = 'flex';
+                betInput.min = data.bigBlind;
+                betInput.placeholder = `最低 ${data.bigBlind}`;
+            } else {
+                callBtn.style.display = 'block';
+                callBtn.textContent = toCall >= game.myChips ? '全下' : `跟注 ${toCall}`;
+
+                if (game.myChips > toCall) {
+                    raiseBtn.style.display = 'block';
+                    betBtn.style.display = 'block';
+                    quickBetBtns.style.display = 'flex';
+                    const minRaise = data.currentBet > 0 ? data.currentBet * 2 : data.bigBlind;
+                    betInput.min = minRaise;
+                    betInput.placeholder = `最低 ${minRaise}`;
+                }
+            }
+
+            // 存储当前游戏数据供下注使用
+            window.currentGameData = data;
+        }
+
+        function playerAction(action) {
+            const data = window.currentGameData || {};
+            const input = document.getElementById('bet-amount');
+            let amount = parseInt(input.value) || 0;
+
+            socket.emit('bet', { action, amount }, (response) => {
+                if (!response.success) {
+                    alert(response.error || '操作失败');
+                }
+            });
+        }
+
+        function setQuickBet(multiple) {
+            const data = window.currentGameData || {};
+            const pot = data.pot || 0;
+            document.getElementById('bet-amount').value = Math.floor(pot * multiple / 100) * 100;
+        }
+
+        function getPhaseName(phase) {
+            const names = {
+                'waiting': '等待开始',
+                'preflop': '翻牌前',
+                'flop': '翻牌圈',
+                'turn': '转牌圈',
+                'river': '河牌圈',
+                'showdown': '摊牌'
+            };
+            return names[phase] || phase;
+        }
+
+        function showModal(title, message) {
+            document.getElementById('modal-title').textContent = title;
+            document.getElementById('modal-message').textContent = message;
+            document.getElementById('result-modal').classList.add('active');
+        }
+
+        function closeModal() {
+            document.getElementById('result-modal').classList.remove('active');
+        }
+
+        // 键盘快捷键
+        document.addEventListener('keydown', (e) => {
+            if (!document.getElementById('game-screen').classList.contains('active')) return;
+            if (document.getElementById('result-modal').classList.contains('active')) return;
+
+            const actionsDiv = document.getElementById('action-area');
+            if (actionsDiv.style.display !== 'flex') return;
+
+            switch (e.key.toLowerCase()) {
+                case 'f': playerAction('fold'); break;
+                case 'c':
+                    if (document.getElementById('check-btn').style.display !== 'none') {
+                        playerAction('check');
+                    } else {
+                        playerAction('call');
+                    }
+                    break;
+                case 'b': playerAction('bet'); break;
+                case 'r': playerAction('raise'); break;
+                case 'a': playerAction('allin'); break;
+                case 'enter': playerAction('bet'); break;
+            }
+        });
+    </script>
+</body>
+</html>
