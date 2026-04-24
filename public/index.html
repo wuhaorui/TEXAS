@@ -717,18 +717,21 @@
 
         // Socket事件
         socket.on('playerJoined', (data) => {
-            if (game.roomId) {
-                updatePlayersList(game.roomId, data.players);
-                updateGamePlayers(data.players);
-            } else {
-                document.getElementById('players-list').innerHTML = data.players.map(p => `
-                    <div class="player-item">
-                        <span class="name">${p.name}</span>
-                        <span class="chips">${p.chips}</span>
-                    </div>
-                `).join('');
+            // 更新玩家列表
+            document.getElementById('players-list').innerHTML = data.players.map(p => `
+                <div class="player-item">
+                    <span class="name">${p.name}</span>
+                    <span class="chips">${p.chips}</span>
+                </div>
+            `).join('');
 
-                document.getElementById('start-game-btn').style.display = data.players.length >= 2 ? 'block' : 'none';
+            // 更新游戏中的玩家列表
+            updateGamePlayers(data.players);
+
+            // 显示/隐藏开始按钮（至少2人才能开始）
+            const startBtn = document.getElementById('start-game-btn');
+            if (startBtn) {
+                startBtn.style.display = data.players.length >= 2 ? 'block' : 'none';
             }
         });
 
