@@ -792,8 +792,6 @@
         }
 
         function startGame() {
-            alert('开始游戏被点击！isHost=' + game.isHost);
-            console.log('startGame called, isHost:', game.isHost, 'roomId:', game.roomId);
             if (!game.isHost) {
                 alert('只有房主可以开始游戏');
                 return;

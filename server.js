@@ -237,6 +237,13 @@ io.on('connection', (socket) => {
             return;
         }
 
+        // 检查重名
+        const existingPlayer = room.players.find(p => p.name === playerName);
+        if (existingPlayer) {
+            callback({ success: false, error: '该名字已被使用，请换一个名字' });
+            return;
+        }
+
         const player = {
             id: socket.playerId,
             socketId: socket.id,
@@ -274,20 +281,23 @@ io.on('connection', (socket) => {
 
     // 开始游戏
     socket.on('startGame', (data, callback) => {
+        console.log('startGame called - socket.id:', socket.id, 'socket.roomId:', socket.roomId, 'socket.playerId:', socket.playerId);
         const room = rooms[socket.roomId];
         if (!room) {
+            console.log('Room not found for roomId:', socket.roomId);
             callback({ success: false, error: '房间不存在' });
             return;
         }
 
         const player = room.players.find(p => p.id === socket.playerId);
+        console.log('Player found:', player ? player.name : 'null', 'isHost:', player ? player.isHost : 'N/A');
         if (!player || !player.isHost) {
             callback({ success: false, error: '只有房主可以开始游戏' });
             return;
         }
 
         if (room.players.length < MIN_PLAYERS) {
-            callback({ success: false, error: `至少需要 ${MIN_PLAYERS} 名玩家` });
+            callback({ success: false, error: `至少需要 ${MIN_PLAYERS} 名玩家，当前 ${room.players.length} 人` });
             return;
         }
 
