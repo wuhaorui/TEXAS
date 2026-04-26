@@ -27,7 +27,7 @@ const RANKS = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A']
 const RANK_VALUES = { '2': 2, '3': 3, '4': 4, '5': 5, '6': 6, '7': 7, '8': 8, '9': 9, '10': 10, 'J': 11, 'Q': 12, 'K': 13, 'A': 14 };
 
 // 创建房间
-function createRoom(hostId, hostName) {
+function createRoom(hostId, hostName, initialChips) {
     const roomId = uuidv4().slice(0, 8).toUpperCase();
     rooms[roomId] = {
         id: roomId,
@@ -42,6 +42,7 @@ function createRoom(hostId, hostName) {
         phaseBets: {}, // 每轮下注 { playerId: amount }
         smallBlind: SMALL_BLIND,
         bigBlind: BIG_BLIND,
+        initialChips: initialChips, // 房间初始筹码，由房主设置
         gameStarted: false,
         createdAt: Date.now()
     };
@@ -187,13 +188,13 @@ io.on('connection', (socket) => {
     // 创建房间
     socket.on('createRoom', (data, callback) => {
         const { playerName, initialChips } = data;
-        const roomId = createRoom(socket.playerId, playerName);
+        const roomId = createRoom(socket.playerId, playerName, initialChips);
 
         const player = {
             id: socket.playerId,
             socketId: socket.id,
             name: playerName,
-            chips: initialChips || 2000,
+            chips: initialChips,
             hand: [],
             currentBet: 0,
             folded: false,
@@ -211,13 +212,14 @@ io.on('connection', (socket) => {
             roomId,
             playerId: socket.playerId,
             playerName,
+            initialChips: initialChips,
             shareUrl: `${data.baseUrl || ''}?room=${roomId}`
         });
     });
 
     // 加入房间
     socket.on('joinRoom', (data, callback) => {
-        const { roomId, playerName, initialChips } = data;
+        const { roomId, playerName } = data;
         const room = rooms[roomId];
 
         if (!room) {
@@ -239,7 +241,7 @@ io.on('connection', (socket) => {
             id: socket.playerId,
             socketId: socket.id,
             name: playerName,
-            chips: initialChips || 2000,
+            chips: room.initialChips, // 使用房间设定的初始筹码
             hand: [],
             currentBet: 0,
             folded: false,
@@ -262,6 +264,7 @@ io.on('connection', (socket) => {
             success: true,
             playerId: socket.playerId,
             roomId,
+            initialChips: room.initialChips,
             players: room.players.map(p => ({ id: p.id, name: p.name, chips: p.chips, isHost: p.isHost })),
             dealer: room.dealer,
             smallBlind: room.smallBlind,

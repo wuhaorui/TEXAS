@@ -485,14 +485,16 @@
             <div class="menu-card">
                 <h2 class="menu-title">创建房间</h2>
                 <input type="text" id="player-name" class="player-name-input" placeholder="输入你的昵称" maxlength="12">
-                <div class="chip-options">
-                    <div class="chip-option chip-1000" onclick="selectChip(this, 1000)">1,000</div>
-                    <div class="chip-option chip-2000 selected" onclick="selectChip(this, 2000)">2,000</div>
+                <div class="chip-options" id="create-chip-options">
+                    <div class="chip-option" onclick="selectChip(this, 1000)">1,000</div>
+                    <div class="chip-option selected" onclick="selectChip(this, 2000)">2,000</div>
+                    <div class="chip-option" onclick="selectChip(this, 5000)">5,000</div>
                 </div>
                 <button class="btn btn-primary" onclick="createRoom()">创建房间</button>
 
                 <div class="room-info" id="room-info">
                     <div class="room-id" id="room-id"></div>
+                    <div class="room-chips" id="room-chips" style="color: var(--text-gold); margin: 10px 0; font-weight: 600;"></div>
                     <div class="share-section">
                         <div class="share-link" id="share-link"></div>
                         <button class="copy-btn" onclick="copyShareLink()">复制链接</button>
@@ -506,7 +508,8 @@
 
             <div class="menu-card">
                 <h2 class="menu-title">加入房间</h2>
-                <input type="text" id="join-room-id" class="player-name-input" placeholder="输入房间号" maxlength="8" style="text-transform: uppercase;">
+                <input type="text" id="join-room-id" class="player-name-input" placeholder="输入房间号或粘贴链接" maxlength="50" style="text-transform: uppercase;">
+                <input type="text" id="join-player-name" class="player-name-input" placeholder="输入你的昵称" maxlength="12">
                 <button class="btn btn-secondary" onclick="joinRoom()">加入</button>
             </div>
         </div>
@@ -648,9 +651,11 @@
                     game.isHost = true;
 
                     document.getElementById('room-id').textContent = `房间号: ${response.roomId}`;
+                    document.getElementById('room-chips').textContent = `初始筹码: ${response.initialChips.toLocaleString()}`;
                     document.getElementById('share-link').textContent = response.shareUrl;
                     document.getElementById('room-info').classList.add('active');
                     document.querySelector('.menu-card:first-child .menu-title').textContent = '房间信息';
+                    document.getElementById('create-chip-options').style.display = 'none';
 
                     updatePlayersList(response.roomId, []);
                 } else {
@@ -660,9 +665,17 @@
         }
 
         function joinRoom() {
-            const nameInput = document.getElementById('player-name');
+            const nameInput = document.getElementById('join-player-name');
             const playerName = nameInput.value.trim() || '玩家' + Math.floor(Math.random() * 1000);
-            const roomId = document.getElementById('join-room-id').value.trim().toUpperCase();
+            const roomInput = document.getElementById('join-room-id');
+            let roomId = roomInput.value.trim().toUpperCase();
+
+            // 支持粘贴完整链接
+            try {
+                const url = new URL(roomId);
+                const params = new URLSearchParams(url.search);
+                roomId = params.get('room') || roomId;
+            } catch (e) {}
 
             if (!roomId) {
                 alert('请输入房间号');
@@ -671,8 +684,7 @@
 
             socket.emit('joinRoom', {
                 roomId,
-                playerName,
-                initialChips: selectedChips
+                playerName
             }, (response) => {
                 if (response.success) {
                     game.playerId = response.playerId;
