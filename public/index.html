@@ -426,6 +426,56 @@
             margin-bottom: 20px;
         }
 
+        .room-info-active {
+            background: rgba(0, 0, 0, 0.4);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+            text-align: left;
+            display: inline-block;
+            min-width: 300px;
+        }
+
+        .room-id-display {
+            font-family: 'Cinzel', serif;
+            font-size: 1.3rem;
+            color: var(--text-gold);
+            margin-bottom: 8px;
+        }
+
+        .room-chips-display {
+            font-size: 1rem;
+            color: var(--text-light);
+            margin-bottom: 12px;
+        }
+
+        .share-row {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .share-link-text {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-size: 0.85rem;
+            max-width: 200px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .copy-btn.small {
+            padding: 8px 15px;
+            font-size: 0.85rem;
+        }
+
+        .start-game-btn {
+            min-width: 200px;
+        }
+
         /* 模态框 */
         .modal-overlay { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, 0.85); z-index: 1000; align-items: center; justify-content: center; }
         .modal-overlay.active { display: flex; }
@@ -589,8 +639,19 @@
             </div>
 
             <div class="waiting-section" id="waiting-section">
+                <div class="room-info-active" id="room-info-active">
+                    <div class="room-id-display">房间号: <span id="display-room-id"></span></div>
+                    <div class="room-chips-display">初始筹码: <span id="display-room-chips"></span></div>
+                    <div class="share-row">
+                        <div class="share-link-text" id="display-share-link"></div>
+                        <button class="copy-btn small" onclick="copyShareLink()">复制</button>
+                    </div>
+                </div>
                 <p class="waiting-text">等待其他玩家加入...</p>
                 <div class="players-list" id="game-players-list"></div>
+                <button class="btn btn-secondary start-game-btn" id="start-game-btn" onclick="startGame()" style="margin-top: 20px; display: none;">
+                    开始游戏
+                </button>
             </div>
         </div>
     </div>
@@ -650,14 +711,21 @@
                     game.roomId = response.roomId;
                     game.isHost = true;
 
-                    document.getElementById('room-id').textContent = `房间号: ${response.roomId}`;
-                    document.getElementById('room-chips').textContent = `初始筹码: ${response.initialChips.toLocaleString()}`;
-                    document.getElementById('share-link').textContent = response.shareUrl;
-                    document.getElementById('room-info').classList.add('active');
-                    document.querySelector('.menu-card:first-child .menu-title').textContent = '房间信息';
-                    document.getElementById('create-chip-options').style.display = 'none';
+                    // 直接进入游戏等待界面
+                    document.getElementById('lobby-screen').classList.remove('active');
+                    document.getElementById('game-screen').classList.add('active');
 
-                    updatePlayersList(response.roomId, []);
+                    // 设置房间信息显示
+                    document.getElementById('display-room-id').textContent = response.roomId;
+                    document.getElementById('display-room-chips').textContent = response.initialChips.toLocaleString();
+                    document.getElementById('display-share-link').textContent = response.shareUrl;
+
+                    // 显示等待区域，隐藏手牌区域
+                    document.getElementById('waiting-section').style.display = 'block';
+                    document.getElementById('player-hand-area').style.display = 'none';
+
+                    // 更新玩家列表
+                    updateGamePlayers([{ id: game.playerId, name: game.playerName, chips: response.initialChips, isHost: true }]);
                 } else {
                     alert('创建房间失败');
                 }
@@ -695,6 +763,13 @@
                     document.getElementById('lobby-screen').classList.remove('active');
                     document.getElementById('game-screen').classList.add('active');
 
+                    // 显示等待区域，隐藏手牌区域
+                    document.getElementById('waiting-section').style.display = 'block';
+                    document.getElementById('player-hand-area').style.display = 'none';
+
+                    // 隐藏房间信息（加入者看不到房间设置）
+                    document.getElementById('room-info-active').style.display = 'none';
+
                     updateGamePlayers(response.players);
                 } else {
                     alert(response.error || '加入房间失败');
@@ -703,13 +778,14 @@
         }
 
         function copyShareLink() {
-            const link = document.getElementById('share-link').textContent;
+            const linkEl = document.getElementById('display-share-link');
+            const link = linkEl ? linkEl.textContent : document.getElementById('share-link').textContent;
             navigator.clipboard.writeText(link).then(() => {
                 const btn = document.querySelector('.copy-btn');
                 btn.textContent = '已复制!';
                 btn.classList.add('copied');
                 setTimeout(() => {
-                    btn.textContent = '复制链接';
+                    btn.textContent = '复制';
                     btn.classList.remove('copied');
                 }, 2000);
             });
@@ -729,28 +805,20 @@
 
         // Socket事件
         socket.on('playerJoined', (data) => {
-            // 更新玩家列表
-            document.getElementById('players-list').innerHTML = data.players.map(p => `
-                <div class="player-item">
-                    <span class="name">${p.name}</span>
-                    <span class="chips">${p.chips}</span>
-                </div>
-            `).join('');
-
             // 更新游戏中的玩家列表
             updateGamePlayers(data.players);
 
-            // 显示/隐藏开始按钮（至少2人才能开始）
+            // 显示/隐藏开始按钮（至少2人才能开始，且仅房主可见）
             const startBtn = document.getElementById('start-game-btn');
-            if (startBtn) {
-                startBtn.style.display = data.players.length >= 2 ? 'block' : 'none';
+            if (startBtn && game.isHost) {
+                startBtn.style.display = data.players.length >= 2 ? 'inline-block' : 'none';
             }
         });
 
         socket.on('gameStarted', (data) => {
-            document.getElementById('lobby-screen').classList.remove('active');
-            document.getElementById('game-screen').classList.add('active');
-            document.getElementById('room-info').classList.remove('active'); // 隐藏房间信息
+            // 隐藏等待区域，显示手牌区域
+            document.getElementById('waiting-section').style.display = 'none';
+            document.getElementById('player-hand-area').style.display = 'block';
 
             game.phase = 'preflop';
             game.currentPlayer = data.currentPlayer;
