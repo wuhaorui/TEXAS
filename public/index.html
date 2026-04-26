@@ -725,7 +725,16 @@
                     document.getElementById('player-hand-area').style.display = 'none';
 
                     // 更新玩家列表
-                    updateGamePlayers([{ id: game.playerId, name: game.playerName, chips: response.initialChips, isHost: true }]);
+                    const players = [{ id: game.playerId, name: game.playerName, chips: response.initialChips, isHost: true }];
+                    updateGamePlayers(players);
+
+                    // 房主创建后显示开始按钮（只有1人，所以禁用）
+                    const startBtn = document.getElementById('start-game-btn');
+                    if (startBtn) {
+                        startBtn.style.display = 'inline-block';
+                        startBtn.disabled = true;
+                        startBtn.style.opacity = '0.5';
+                    }
                 } else {
                     alert('创建房间失败');
                 }
@@ -808,10 +817,18 @@
             // 更新游戏中的玩家列表
             updateGamePlayers(data.players);
 
-            // 显示/隐藏开始按钮（至少2人才能开始，且仅房主可见）
+            // 控制开始按钮（至少2人才能开始，且仅房主可见）
             const startBtn = document.getElementById('start-game-btn');
             if (startBtn && game.isHost) {
-                startBtn.style.display = data.players.length >= 2 ? 'inline-block' : 'none';
+                if (data.players.length >= 2) {
+                    startBtn.style.display = 'inline-block';
+                    startBtn.disabled = false;
+                    startBtn.style.opacity = '1';
+                } else {
+                    startBtn.style.display = 'inline-block';
+                    startBtn.disabled = true;
+                    startBtn.style.opacity = '0.5';
+                }
             }
         });
 
