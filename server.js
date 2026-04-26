@@ -281,34 +281,47 @@ io.on('connection', (socket) => {
 
     // 开始游戏
     socket.on('startGame', (data, callback) => {
-        console.log('startGame called - socket.id:', socket.id, 'socket.roomId:', socket.roomId, 'socket.playerId:', socket.playerId);
+        console.log('=== startGame ===');
+        console.log('socket.id:', socket.id);
+        console.log('socket.roomId:', socket.roomId);
+        console.log('socket.playerId:', socket.playerId);
+
         const room = rooms[socket.roomId];
         if (!room) {
-            console.log('Room not found for roomId:', socket.roomId);
+            console.log('FAIL: Room not found');
             callback({ success: false, error: '房间不存在' });
             return;
         }
 
+        console.log('Room found, players:', room.players.length);
+
         const player = room.players.find(p => p.id === socket.playerId);
         console.log('Player found:', player ? player.name : 'null', 'isHost:', player ? player.isHost : 'N/A');
+
         if (!player || !player.isHost) {
+            console.log('FAIL: Not host');
             callback({ success: false, error: '只有房主可以开始游戏' });
             return;
         }
 
+        console.log('Player count check:', room.players.length, '>=', MIN_PLAYERS);
         if (room.players.length < MIN_PLAYERS) {
+            console.log('FAIL: Not enough players');
             callback({ success: false, error: `至少需要 ${MIN_PLAYERS} 名玩家，当前 ${room.players.length} 人` });
             return;
         }
 
         // 检查所有玩家是否有足够筹码
         for (const p of room.players) {
+            console.log('Chip check:', p.name, p.chips, '>=', room.bigBlind * 2);
             if (p.chips < room.bigBlind * 2) {
+                console.log('FAIL: Not enough chips');
                 callback({ success: false, error: `${p.name} 筹码不足` });
                 return;
             }
         }
 
+        console.log('All checks passed, starting game...');
         room.gameStarted = true;
         room.dealer = Math.floor(Math.random() * room.players.length);
         startNewHand(room);
@@ -332,6 +345,7 @@ io.on('connection', (socket) => {
             bigBlind: room.bigBlind
         });
 
+        console.log('SUCCESS: Game started');
         callback({ success: true });
     });
 
