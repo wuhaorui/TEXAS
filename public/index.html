@@ -636,7 +636,7 @@
                 </div>
                 <p class="waiting-text">等待其他玩家加入...</p>
                 <div class="players-list" id="game-players-list"></div>
-                <button class="btn btn-secondary start-game-btn" id="start-game-btn" onclick="startGame()" style="margin-top: 20px; display: none;">
+                <button type="button" class="btn btn-secondary start-game-btn" id="start-game-btn" onclick="startGame(); return false;" style="margin-top: 20px; display: none;">
                     开始游戏
                 </button>
             </div>
@@ -792,7 +792,14 @@
         }
 
         function startGame() {
+            alert('开始游戏被点击！isHost=' + game.isHost);
+            console.log('startGame called, isHost:', game.isHost, 'roomId:', game.roomId);
+            if (!game.isHost) {
+                alert('只有房主可以开始游戏');
+                return;
+            }
             socket.emit('startGame', {}, (response) => {
+                console.log('startGame response:', response);
                 if (!response.success) {
                     alert(response.error || '开始游戏失败');
                 }
