@@ -750,6 +750,7 @@
         socket.on('gameStarted', (data) => {
             document.getElementById('lobby-screen').classList.remove('active');
             document.getElementById('game-screen').classList.add('active');
+            document.getElementById('room-info').classList.remove('active'); // 隐藏房间信息
 
             game.phase = 'preflop';
             game.currentPlayer = data.currentPlayer;
@@ -891,7 +892,7 @@
             document.getElementById('player-hand-area').style.display = 'block';
             document.getElementById('waiting-section').style.display = 'none';
 
-            enableActions();
+            enableActions(data);
         }
 
         function updateGamePlayers(players) {
@@ -908,7 +909,7 @@
             }
         }
 
-        function enableActions() {
+        function enableActions(data) {
             const myPlayerIndex = game.players.findIndex(p => p.id === game.playerId);
             const isMyTurn = myPlayerIndex === game.currentPlayer;
             const player = game.players[myPlayerIndex];
