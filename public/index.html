@@ -995,14 +995,37 @@
             document.getElementById('waiting-section').style.display = 'none';
             document.getElementById('playing-area').style.display = 'block';
 
-            // 显示新对局开始的提示
+            // 保存自己的手牌
+            const me = data.players.find(p => p.id === game.playerId);
+            game.myHand = me && me.hand ? [...me.hand] : [];
+
+            // 清空公共牌显示
+            const communityCards = document.querySelectorAll('#community-cards .card');
+            communityCards.forEach(card => {
+                card.className = 'card face-down hidden';
+                card.innerHTML = '';
+            });
+
+            // 显示新对局开始的提示（使用自定义对话框，只有确定按钮）
             const dealerSeat = data.players[data.dealer];
-            alert(`🃏 新对局开始！\n\nDealer: ${dealerSeat.name}\n小盲: ${data.players[(data.dealer + 1) % data.players.length].name}\n大盲: ${data.players[(data.dealer + 2) % data.players.length].name}`);
+            document.getElementById('new-hand-title').textContent = '🃏 新对局开始！';
+            document.getElementById('new-hand-message').innerHTML = `
+                庄家: ${dealerSeat.name}<br>
+                小盲: ${data.players[(data.dealer + 1) % data.players.length].name}<br>
+                大盲: ${data.players[(data.dealer + 2) % data.players.length].name}
+            `;
+            document.getElementById('new-hand-modal').style.display = 'flex';
 
             updateGameState(data);
         });
 
+        // 关闭新对局对话框
+        function closeNewHandModal() {
+            document.getElementById('new-hand-modal').style.display = 'none';
+        }
+
         socket.on('gameUpdate', (data) => {
+            console.log('[gameUpdate] dealer:', data.dealer, 'phase:', data.phase, 'currentPlayer:', data.currentPlayer);
             updateGameState(data);
         });
 
@@ -1037,20 +1060,19 @@
             alert(message);
         });
 
-        // ============ 更新游戏状态 ============
         function updateGameState(data) {
-            // 保留原有的手牌数据，避免 gameUpdate 覆盖
-            if (game.players && data.players) {
-                data.players.forEach((p, i) => {
-                    if (game.players[i] && game.players[i].hand) {
-                        p.hand = game.players[i].hand;
-                    }
-                });
+            // 保留自己的手牌（服务器发送的 gameUpdate 中没有 hand 字段）
+            if (game.myHand && game.myHand.length > 0) {
+                const me = data.players.find(p => p.id === game.playerId);
+                if (me) me.hand = game.myHand;
             }
+
             game.players = data.players;
             game.currentPlayer = data.currentPlayer;
             game.phase = data.phase;
             game.dealer = data.dealer;
+
+            console.log('[updateGameState] dealer:', data.dealer, 'dealerIdx will be:', data.dealer, 'phase:', data.phase);
 
             document.getElementById('pot-amount').textContent = data.pot.toLocaleString();
 

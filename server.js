@@ -706,6 +706,7 @@ io.on('connection', (socket) => {
         const allActed = activePlayers.every(p => room.actedThisPhase.has(room.players.indexOf(p)));
 
         console.log(`[下注后] 动作:${action} 玩家:${player.name} | nextPlayer:${nextPlayer} | allMatched:${allMatched} | allActed:${allActed} | acted:${[...room.actedThisPhase]}`);
+        console.log(`[下注后] room.dealer:${room.dealer}, room.phase:${room.phase}`);
 
         // 情况1：没有可行动玩家了（都fold或allIn），直接进入下一阶段
         if (nextPlayer === -1) {
