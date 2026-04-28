@@ -35,64 +35,118 @@ const HAND_RANKS = {
 };
 
 function evaluateHand(cards) {
-    // cards: [{suit, rank, value}]
+    // cards: [{suit, rank, value}] — 7张牌（2张手牌 + 5张公共牌）
+    // 德州扑克规则：从7张牌中选出最好的5张牌组合
+
     const values = cards.map(c => c.value).sort((a, b) => b - a);
     const suits = cards.map(c => c.suit);
     const valueCounts = {};
     values.forEach(v => valueCounts[v] = (valueCounts[v] || 0) + 1);
 
-    const isFlush = suits.every(s => s === suits[0]);
-    const isStraight = values.every((v, i) => i === 0 || v === values[i-1] - 1);
+    // 统计每个花色的牌数，判断是否存在同花（至少5张同花色）
+    const suitCounts = {};
+    suits.forEach(s => suitCounts[s] = (suitCounts[s] || 0) + 1);
+    const flushSuit = Object.keys(suitCounts).find(s => suitCounts[s] >= 5) || null;
+    const isFlush = flushSuit !== null;
 
-    // 特殊处理 A-2-3-4-5 顺子
-    const isWheel = JSON.stringify(values) === JSON.stringify([14, 5, 4, 3, 2]);
+    // 收集同花色的牌的值（用于同花比较）
+    const flushValues = flushSuit
+        ? cards.filter(c => c.suit === flushSuit).map(c => c.value).sort((a, b) => b - a)
+        : [];
+
+    // 判断顺子：从去重的值中找连续5个
+    const uniqueValues = [...new Set(values)].sort((a, b) => b - a);
+    // 特殊处理 A 可以当 1 用
+    if (uniqueValues.includes(14)) uniqueValues.push(1);
+    uniqueValues.sort((a, b) => b - a);
+    let isStraight = false;
+    let straightHigh = 0;
+    for (let i = 0; i <= uniqueValues.length - 5; i++) {
+        if (uniqueValues[i] - uniqueValues[i + 4] === 4) {
+            isStraight = true;
+            straightHigh = uniqueValues[i];
+            break;
+        }
+    }
+    // 特殊处理 A-2-3-4-5
+    const isWheel = !isStraight && uniqueValues.includes(5) && uniqueValues.includes(4)
+        && uniqueValues.includes(3) && uniqueValues.includes(2) && uniqueValues.includes(14);
 
     const counts = Object.entries(valueCounts).sort((a, b) => b[1] - a[1] || b[0] - a[0]);
     const [v1, c1] = counts[0];
     const [v2, c2] = counts[1] || [0, 0];
 
-    let handRank, handName, tieBreaker;
+    let handRank, handName, tieBreaker, bestValues;
 
     if (isFlush && (isStraight || isWheel)) {
-        const isRoyal = values[0] === 14 && values[4] === 10;
+        // 同花顺：用同花花色的牌判断顺子
+        const fv = flushValues;
+        let sfHigh = 0;
+        for (let i = 0; i <= fv.length - 5; i++) {
+            if (fv[i] - fv[i + 4] === 4) {
+                sfHigh = fv[i];
+                break;
+            }
+        }
+        // 检查 A-2-3-4-5 同花顺
+        const isWheelFlush = !sfHigh && fv.includes(5) && fv.includes(4)
+            && fv.includes(3) && fv.includes(2) && fv.includes(14);
+        const isRoyal = (sfHigh === 14) || (isWheelFlush && fv[0] === 14 && fv.includes(10));
         handName = isRoyal ? '皇家同花顺' : '同花顺';
         handRank = HAND_RANKS[handName];
-        tieBreaker = isWheel ? 5 : values[0]; // A-5顺子用5比
+        tieBreaker = isWheelFlush ? 5 : (sfHigh || 5);
+        bestValues = isWheelFlush ? [5, 4, 3, 2, 1] : fv.slice(0, 5);
     } else if (c1 === 4) {
         handName = '四条';
         handRank = HAND_RANKS[handName];
-        tieBreaker = v1;
+        tieBreaker = parseInt(v1);
+        // 四条的 bestValues: 4张 + 最大踢牌
+        const quadValues = cards.filter(c => c.value === parseInt(v1)).map(c => c.value);
+        const kicker = values.find(v => v !== parseInt(v1));
+        bestValues = [...quadValues.slice(0, 4), kicker || 0];
     } else if (c1 === 3 && c2 === 2) {
         handName = '葫芦';
         handRank = HAND_RANKS[handName];
-        tieBreaker = v1;
+        tieBreaker = parseInt(v1);
+        bestValues = [parseInt(v1), parseInt(v1), parseInt(v1), parseInt(v2), parseInt(v2)];
     } else if (isFlush) {
         handName = '同花';
         handRank = HAND_RANKS[handName];
-        tieBreaker = values[0];
+        tieBreaker = flushValues[0];
+        bestValues = flushValues.slice(0, 5);
     } else if (isStraight || isWheel) {
         handName = '顺子';
         handRank = HAND_RANKS[handName];
-        tieBreaker = isWheel ? 5 : values[0];
+        tieBreaker = isWheel ? 5 : straightHigh;
+        bestValues = isWheel ? [5, 4, 3, 2, 1] : [straightHigh, straightHigh-1, straightHigh-2, straightHigh-3, straightHigh-4];
     } else if (c1 === 3) {
         handName = '三条';
         handRank = HAND_RANKS[handName];
-        tieBreaker = v1;
+        tieBreaker = parseInt(v1);
+        const triple = cards.filter(c => c.value === parseInt(v1)).map(c => c.value);
+        const kickers = values.filter(v => v !== parseInt(v1)).slice(0, 2);
+        bestValues = [...triple, ...kickers];
     } else if (c1 === 2 && c2 === 2) {
         handName = '两对';
         handRank = HAND_RANKS[handName];
-        tieBreaker = Math.max(v1, v2);
+        tieBreaker = Math.max(parseInt(v1), parseInt(v2));
+        const kick = values.find(v => v !== parseInt(v1) && v !== parseInt(v2));
+        bestValues = [Math.max(parseInt(v1), parseInt(v2)), Math.min(parseInt(v1), parseInt(v2)), Math.max(parseInt(v1), parseInt(v2)), Math.min(parseInt(v1), parseInt(v2)), kick || 0];
     } else if (c1 === 2) {
         handName = '一对';
         handRank = HAND_RANKS[handName];
-        tieBreaker = v1;
+        tieBreaker = parseInt(v1);
+        const pair = cards.filter(c => c.value === parseInt(v1)).map(c => c.value);
+        const kickers = values.filter(v => v !== parseInt(v1)).slice(0, 3);
+        bestValues = [...pair, ...kickers];
     } else {
         handName = '高牌';
         handRank = HAND_RANKS[handName];
         tieBreaker = values[0];
+        bestValues = values.slice(0, 5);
     }
 
-    return { handRank, handName, tieBreaker, values };
+    return { handRank, handName, tieBreaker, values: bestValues };
 }
 
 function getWinners(players, communityCards) {

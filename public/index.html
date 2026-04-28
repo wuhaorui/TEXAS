@@ -1019,9 +1019,13 @@
             updateGameState(data);
         });
 
-        // 关闭新对局对话框
+        // 关闭新对局对话框，并刷新下注UI
         function closeNewHandModal() {
             document.getElementById('new-hand-modal').style.display = 'none';
+            // 关闭模态框后，重新检查是否该我行动，显示下注UI
+            if (window.currentGameData) {
+                enableActions(window.currentGameData);
+            }
         }
 
         socket.on('gameUpdate', (data) => {
