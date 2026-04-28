@@ -7,7 +7,9 @@ const path = require('path');
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server, {
-    cors: { origin: '*' }
+    cors: { origin: '*' },
+    pingTimeout: 60000,
+    pingInterval: 25000
 });
 
 app.use(express.static(path.join(__dirname, 'public')));
@@ -446,15 +448,27 @@ io.on('connection', (socket) => {
     });
 
     // 断开连接
-    socket.on('disconnect', () => {
-        console.log('用户断开:', socket.id);
+    socket.on('disconnect', (reason) => {
+        console.log('=== DISCONNECT ===');
+        console.log('socket.id:', socket.id);
+        console.log('socket.playerId:', socket.playerId);
+        console.log('socket.roomId:', socket.roomId);
+        console.log('reason:', reason);
         const room = rooms[socket.roomId];
-        if (!room) return;
+        if (!room) {
+            console.log('房间不存在于 disconnect');
+            return;
+        }
+        console.log('房间:', room.id, '游戏已开始:', room.gameStarted);
 
         const playerIndex = room.players.findIndex(p => p.id === socket.playerId);
-        if (playerIndex === -1) return;
+        if (playerIndex === -1) {
+            console.log('找不到玩家:', socket.playerId);
+            return;
+        }
 
         const player = room.players[playerIndex];
+        console.log('离开的玩家:', player.name, '(index:', playerIndex, ')');
         io.to(room.id).emit('playerLeft', { playerId: socket.playerId, playerName: player.name });
 
         room.players.splice(playerIndex, 1);
