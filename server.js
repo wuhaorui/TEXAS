@@ -433,6 +433,87 @@ io.on('connection', (socket) => {
         });
     });
 
+    // 重新加入房间
+    socket.on('rejoinRoom', (data, callback) => {
+        const { roomId, playerName, oldPlayerId } = data;
+
+        const room = rooms[roomId];
+        if (!room) {
+            callback({ success: false, error: '房间不存在或已结束' });
+            return;
+        }
+
+        // 查找是否有同名的老玩家
+        let player = room.players.find(p => p.name === playerName);
+
+        if (player) {
+            // 找到同名玩家，重新分配 socket
+            player.socketId = socket.id;
+            socket.playerId = player.id;
+            socket.roomId = roomId;
+            socket.join(roomId);
+
+            console.log(`玩家重新加入: ${playerName} 房间 ${roomId}`);
+
+            callback({
+                success: true,
+                playerId: player.id,
+                isHost: player.isHost,
+                players: room.players.map(p => ({
+                    id: p.id,
+                    name: p.name,
+                    chips: p.chips,
+                    ready: p.ready,
+                    isHost: p.isHost
+                })),
+                gameInProgress: room.gameStarted
+            });
+        } else {
+            // 没有找到同名玩家，作为新玩家加入
+            const newPlayer = {
+                id: oldPlayerId || uuidv4(),
+                socketId: socket.id,
+                name: playerName,
+                chips: room.initialChips,
+                hand: [],
+                currentBet: 0,
+                folded: false,
+                allIn: false,
+                isHost: false,
+                ready: false
+            };
+
+            room.players.push(newPlayer);
+            socket.playerId = newPlayer.id;
+            socket.roomId = roomId;
+            socket.join(roomId);
+
+            io.to(room.id).emit('playerJoined', {
+                players: room.players.map(p => ({
+                    id: p.id,
+                    name: p.name,
+                    chips: p.chips,
+                    ready: p.ready,
+                    isHost: p.isHost
+                }))
+            });
+
+            callback({
+                success: true,
+                playerId: newPlayer.id,
+                isHost: false,
+                players: room.players.map(p => ({
+                    id: p.id,
+                    name: p.name,
+                    chips: p.chips,
+                    ready: p.ready,
+                    isHost: p.isHost
+                })),
+                gameInProgress: false
+            });
+        }
+    });
+
     // 准备/取消准备
     socket.on('playerReady', (data, callback) => {
         const room = rooms[socket.roomId];

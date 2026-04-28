@@ -420,6 +420,55 @@
             margin-left: 5px;
         }
 
+        /* 自定义对话框 */
+        .modal-overlay {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0, 0, 0, 0.7);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+
+        .modal-box {
+            background: linear-gradient(145deg, #1a3a5c, #0d5c2e);
+            border: 2px solid var(--gold-accent);
+            border-radius: 16px;
+            padding: 30px 40px;
+            text-align: center;
+            min-width: 300px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+        }
+
+        .modal-title {
+            font-family: 'Cinzel', serif;
+            font-size: 1.5rem;
+            color: var(--text-gold);
+            margin-bottom: 15px;
+        }
+
+        .modal-message {
+            color: var(--text-light);
+            font-size: 1rem;
+            line-height: 1.8;
+            margin-bottom: 20px;
+        }
+
+        .modal-btn {
+            padding: 10px 40px;
+            font-size: 1rem;
+            font-weight: 700;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            background: linear-gradient(145deg, var(--gold-accent), #b8941f);
+            color: #1a1a2e;
+            transition: all 0.3s;
+        }
+
+        .modal-btn:hover { transform: scale(1.05); box-shadow: 0 5px 20px rgba(212, 175, 55, 0.4); }
+
         .ready-badge {
             background: #27ae60;
             color: white;
@@ -525,6 +574,15 @@
                 </div>
             </div>
 
+            <!-- 自定义对话框：新对局开始 -->
+            <div class="modal-overlay" id="new-hand-modal" style="display:none;">
+                <div class="modal-box">
+                    <div class="modal-title" id="new-hand-title">🃏 新对局开始！</div>
+                    <div class="modal-message" id="new-hand-message"></div>
+                    <button class="modal-btn" onclick="closeNewHandModal()">确定</button>
+                </div>
+            </div>
+
             <div class="waiting-section" id="waiting-section">
                 <div class="room-info-box" id="room-info-box">
                     <div class="room-id-display">房间号: <span id="display-room-id"></span></div>
@@ -623,12 +681,84 @@
 
         let selectedChips = 2000;
 
+        // ============ 重新加入逻辑 ============
+        function checkRejoin() {
+            const savedRoomId = localStorage.getItem('texas_roomId');
+            const savedPlayerName = localStorage.getItem('texas_playerName');
+            const savedPlayerId = localStorage.getItem('texas_playerId');
+
+            if (savedRoomId && savedPlayerName) {
+                // 自动填充表单
+                document.getElementById('join-room-id').value = savedRoomId;
+                document.getElementById('join-player-name').value = savedPlayerName;
+
+                // 提示用户是否重新加入
+                if (confirm(`检测到你之前在房间 ${savedRoomId}，是否以"${savedPlayerName}"的身份重新加入？`)) {
+                    rejoinRoom(savedRoomId, savedPlayerName, savedPlayerId);
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        function rejoinRoom(roomId, playerName, oldPlayerId) {
+            socket.emit('rejoinRoom', { roomId, playerName, oldPlayerId }, (response) => {
+                if (response.success) {
+                    game.playerId = response.playerId;
+                    game.playerName = playerName;
+                    game.roomId = roomId;
+                    game.isHost = response.isHost;
+
+                    document.getElementById('lobby-screen').classList.remove('active');
+                    document.getElementById('game-screen').classList.add('active');
+                    document.getElementById('waiting-section').style.display = 'block';
+                    document.getElementById('playing-area').style.display = 'none';
+
+                    updatePlayersList(response.players);
+                    updateStartButton(response.players);
+
+                    if (response.gameInProgress) {
+                        // 游戏进行中，直接跳到游戏界面
+                        document.getElementById('waiting-section').style.display = 'none';
+                        document.getElementById('playing-area').style.display = 'block';
+                        // 请求当前游戏状态
+                        socket.emit('requestGameState');
+                    }
+                } else {
+                    alert(response.error || '重新加入失败');
+                    // 清除本地存储
+                    localStorage.removeItem('texas_roomId');
+                    localStorage.removeItem('texas_playerName');
+                    localStorage.removeItem('texas_playerId');
+                }
+            });
+        }
+
+        function saveRoomInfo(roomId, playerName, playerId) {
+            localStorage.setItem('texas_roomId', roomId);
+            localStorage.setItem('texas_playerName', playerName);
+            localStorage.setItem('texas_playerId', playerId);
+        }
+
+        function clearRoomInfo() {
+            localStorage.removeItem('texas_roomId');
+            localStorage.removeItem('texas_playerName');
+            localStorage.removeItem('texas_playerId');
+        }
+
         // ============ 初始化 ============
         const urlParams = new URLSearchParams(window.location.search);
         const roomFromUrl = urlParams.get('room');
         if (roomFromUrl) {
             document.getElementById('join-room-id').value = roomFromUrl;
         }
+
+        // 检查是否可以重新加入
+        setTimeout(() => {
+            if (!game.roomId) {
+                checkRejoin();
+            }
+        }, 500);
 
         // ============ 筹码选择 ============
         function selectChip(el, chips) {
@@ -652,6 +782,9 @@
                     game.playerName = response.playerName;
                     game.roomId = response.roomId;
                     game.isHost = true;
+
+                    // 保存房间信息到本地
+                    saveRoomInfo(response.roomId, response.playerName, response.playerId);
 
                     // 进入等待界面
                     document.getElementById('lobby-screen').classList.remove('active');
@@ -705,6 +838,9 @@
                     game.playerName = playerName;
                     game.roomId = roomId;
                     game.isHost = false;
+
+                    // 保存房间信息到本地
+                    saveRoomInfo(roomId, playerName, response.playerId);
 
                     document.getElementById('lobby-screen').classList.remove('active');
                     document.getElementById('game-screen').classList.add('active');
