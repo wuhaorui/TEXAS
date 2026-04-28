@@ -100,6 +100,61 @@ function startNewHand(room) {
     room.phase = 'preflop';
 }
 
+// 进入下一阶段
+function advancePhase(room) {
+    // 重置本轮下注
+    room.currentBet = 0;
+    room.players.forEach(p => p.currentBet = 0);
+
+    if (room.phase === 'preflop') {
+        // 翻牌圈：发3张公共牌
+        for (let i = 0; i < 3; i++) {
+            room.communityCards.push(room.deck.pop());
+        }
+        room.phase = 'flop';
+    } else if (room.phase === 'flop') {
+        // 转牌圈：发1张
+        room.communityCards.push(room.deck.pop());
+        room.phase = 'turn';
+    } else if (room.phase === 'turn') {
+        // 河牌圈：发1张
+        room.communityCards.push(room.deck.pop());
+        room.phase = 'river';
+    } else if (room.phase === 'river') {
+        // 进入摊牌
+        room.phase = 'showdown';
+        io.to(room.id).emit('gameEnd', {
+            players: room.players,
+            communityCards: room.communityCards,
+            pot: room.pot
+        });
+        return;
+    }
+
+    // 设置下一位玩家（从dealer下一位开始）
+    room.currentPlayer = (room.dealer + 1) % room.players.length;
+
+    // 如果下一位玩家已fold或allIn，找下一个
+    while (room.players[room.currentPlayer].folded || room.players[room.currentPlayer].allIn) {
+        room.currentPlayer = (room.currentPlayer + 1) % room.players.length;
+    }
+
+    io.to(room.id).emit('gameUpdate', {
+        players: room.players.map(p => ({
+            id: p.id,
+            name: p.name,
+            chips: p.chips,
+            currentBet: p.currentBet,
+            folded: p.folded
+        })),
+        communityCards: room.communityCards,
+        pot: room.pot,
+        currentBet: room.currentBet,
+        currentPlayer: room.currentPlayer,
+        phase: room.phase
+    });
+}
+
 // ============ Socket 处理 ============
 io.on('connection', (socket) => {
     console.log('用户连接:', socket.id);
@@ -383,8 +438,9 @@ io.on('connection', (socket) => {
             amount: amount || 0
         });
 
+        // 计算下一个可以行动的玩家
         let nextPlayer = -1;
-        for (let i = 1; i <= room.players.length; i++) {
+        for (let i = 1; i < room.players.length; i++) {
             const idx = (playerIndex + i) % room.players.length;
             if (!room.players[idx].folded && !room.players[idx].allIn) {
                 nextPlayer = idx;
@@ -392,15 +448,19 @@ io.on('connection', (socket) => {
             }
         }
 
-        if (nextPlayer === -1 || room.phase === 'showdown') {
-            room.phase = 'showdown';
-            io.to(room.id).emit('gameEnd', {
-                players: room.players,
-                communityCards: room.communityCards,
-                pot: room.pot
-            });
+        // 检查是否所有未fold的玩家都跟注到相同金额（一轮结束）
+        const activePlayers = room.players.filter(p => !p.folded && !p.allIn);
+        const allMatched = activePlayers.length > 0 && activePlayers.every(p => p.currentBet === room.currentBet);
+
+        console.log(`[下注后] 动作:${action} 玩家:${player.name} | nextPlayer:${nextPlayer} | allMatched:${allMatched} | activePlayers:${activePlayers.length}`);
+
+        if (nextPlayer === -1 || allMatched || room.phase === 'showdown') {
+            // 一轮结束，进入下一阶段
+            console.log('[下注后] 进入下一阶段');
+            advancePhase(room);
         } else {
             room.currentPlayer = nextPlayer;
+            console.log(`[下注后] 下一个玩家索引:${nextPlayer} (${room.players[nextPlayer].name})`);
             io.to(room.id).emit('gameUpdate', {
                 players: room.players.map(p => ({
                     id: p.id,
@@ -409,6 +469,7 @@ io.on('connection', (socket) => {
                     currentBet: p.currentBet,
                     folded: p.folded
                 })),
+                communityCards: room.communityCards,
                 pot: room.pot,
                 currentBet: room.currentBet,
                 currentPlayer: room.currentPlayer,
