@@ -303,7 +303,8 @@ function advancePhase(room) {
         pot: room.pot,
         currentBet: room.currentBet,
         currentPlayer: room.currentPlayer,
-        phase: room.phase
+        phase: room.phase,
+        dealer: room.dealer  // 添加 dealer 字段，前端用于显示位置标识
     });
 }
 

@@ -763,7 +763,10 @@
             const input = document.getElementById('bet-amount');
             const amount = parseInt(input.value) || 0;
 
+            console.log('[playerAction]', action, 'socket.connected:', socket.connected, 'socket.id:', socket.id);
+
             socket.emit('bet', { action, amount }, (response) => {
+                console.log('[playerAction] response:', response);
                 if (!response.success) {
                     alert(response.error || '操作失败');
                 }
