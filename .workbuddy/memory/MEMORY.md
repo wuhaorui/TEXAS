@@ -38,7 +38,9 @@
 - 发牌顺序：玩家→对手→玩家→对手交替发牌（一人一张交替）
 - Socket.io callback一定要处理返回值
 - Room对象属性：是 `room.id` 不是 `room.roomId`，后者是undefined
-- 下注轮转：需要检查一轮是否结束（allMatched），否则玩家会一直卡住
+- 下注轮转判断：不能只用"轮回到第一个玩家"判断，需要用 actedThisPhase 集合跟踪已行动玩家
+- 加注处理：有人加注后需重置其他玩家的已行动标记，让他们重新跟注
+- 一轮结束条件：所有active玩家都已行动 且 下注金额相等
 - Railway连接：需要添加心跳配置 pingTimeout/pingInterval 防止连接超时
 
 ### 多人版界面布局（2026-04）

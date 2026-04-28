@@ -868,11 +868,40 @@
 
         socket.on('gameEnd', (data) => {
             console.log('游戏结束:', data);
-            alert('游戏结束!');
+
+            // 显示所有玩家的手牌和牌型
+            let message = `🃏 游戏结束！\n\n`;
+
+            if (data.handName === '对手弃牌') {
+                const winner = data.players.find(p => !p.folded);
+                message += `🏆 ${winner.name} 获胜！（对手弃牌）\n`;
+                message += `💰 赢得 ${data.pot.toLocaleString()} 筹码\n`;
+            } else {
+                data.results.forEach(r => {
+                    const player = data.players.find(p => p.id === r.playerId);
+                    const isWinner = data.winners.includes(r.playerId);
+                    message += `${isWinner ? '🏆' : '  '} ${player.name}: ${r.handName}\n`;
+                });
+                message += `\n💰 奖池: ${data.pot.toLocaleString()} 筹码\n`;
+            }
+
+            // 更新玩家筹码显示
+            game.players = data.players;
+            updateGameState(data);
+
+            alert(message);
         });
 
         // ============ 更新游戏状态 ============
         function updateGameState(data) {
+            // 保留原有的手牌数据，避免 gameUpdate 覆盖
+            if (game.players && data.players) {
+                data.players.forEach((p, i) => {
+                    if (game.players[i] && game.players[i].hand) {
+                        p.hand = game.players[i].hand;
+                    }
+                });
+            }
             game.players = data.players;
             game.currentPlayer = data.currentPlayer;
             game.phase = data.phase;

@@ -28,6 +28,109 @@ const SUITS = ['♠', '♥', '♦', '♣'];
 const RANKS = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A'];
 const RANK_VALUES = { '2': 2, '3': 3, '4': 4, '5': 5, '6': 6, '7': 7, '8': 8, '9': 9, '10': 10, 'J': 11, 'Q': 12, 'K': 13, 'A': 14 };
 
+// ============ 扑克手牌评估 ============
+const HAND_RANKS = {
+    '高牌': 1, '一对': 2, '两对': 3, '三条': 4, '顺子': 5,
+    '同花': 6, '葫芦': 7, '四条': 8, '同花顺': 9, '皇家同花顺': 10
+};
+
+function evaluateHand(cards) {
+    // cards: [{suit, rank, value}]
+    const values = cards.map(c => c.value).sort((a, b) => b - a);
+    const suits = cards.map(c => c.suit);
+    const valueCounts = {};
+    values.forEach(v => valueCounts[v] = (valueCounts[v] || 0) + 1);
+
+    const isFlush = suits.every(s => s === suits[0]);
+    const isStraight = values.every((v, i) => i === 0 || v === values[i-1] - 1);
+
+    // 特殊处理 A-2-3-4-5 顺子
+    const isWheel = JSON.stringify(values) === JSON.stringify([14, 5, 4, 3, 2]);
+
+    const counts = Object.entries(valueCounts).sort((a, b) => b[1] - a[1] || b[0] - a[0]);
+    const [v1, c1] = counts[0];
+    const [v2, c2] = counts[1] || [0, 0];
+
+    let handRank, handName, tieBreaker;
+
+    if (isFlush && (isStraight || isWheel)) {
+        const isRoyal = values[0] === 14 && values[4] === 10;
+        handName = isRoyal ? '皇家同花顺' : '同花顺';
+        handRank = HAND_RANKS[handName];
+        tieBreaker = isWheel ? 5 : values[0]; // A-5顺子用5比
+    } else if (c1 === 4) {
+        handName = '四条';
+        handRank = HAND_RANKS[handName];
+        tieBreaker = v1;
+    } else if (c1 === 3 && c2 === 2) {
+        handName = '葫芦';
+        handRank = HAND_RANKS[handName];
+        tieBreaker = v1;
+    } else if (isFlush) {
+        handName = '同花';
+        handRank = HAND_RANKS[handName];
+        tieBreaker = values[0];
+    } else if (isStraight || isWheel) {
+        handName = '顺子';
+        handRank = HAND_RANKS[handName];
+        tieBreaker = isWheel ? 5 : values[0];
+    } else if (c1 === 3) {
+        handName = '三条';
+        handRank = HAND_RANKS[handName];
+        tieBreaker = v1;
+    } else if (c1 === 2 && c2 === 2) {
+        handName = '两对';
+        handRank = HAND_RANKS[handName];
+        tieBreaker = Math.max(v1, v2);
+    } else if (c1 === 2) {
+        handName = '一对';
+        handRank = HAND_RANKS[handName];
+        tieBreaker = v1;
+    } else {
+        handName = '高牌';
+        handRank = HAND_RANKS[handName];
+        tieBreaker = values[0];
+    }
+
+    return { handRank, handName, tieBreaker, values };
+}
+
+function getWinners(players, communityCards) {
+    const activePlayers = players.filter(p => !p.folded);
+    if (activePlayers.length === 1) {
+        return { winners: [activePlayers[0]], handName: '对手弃牌' };
+    }
+
+    const results = activePlayers.map(p => {
+        const allCards = [...p.hand, ...communityCards];
+        const bestHand = evaluateHand(allCards);
+        return { player: p, ...bestHand };
+    });
+
+    // 按 handRank > tieBreaker > values 排序
+    results.sort((a, b) => {
+        if (b.handRank !== a.handRank) return b.handRank - a.handRank;
+        if (b.tieBreaker !== a.tieBreaker) return b.tieBreaker - a.tieBreaker;
+        for (let i = 0; i < a.values.length; i++) {
+            if (b.values[i] !== a.values[i]) return b.values[i] - a.values[i];
+        }
+        return 0;
+    });
+
+    const winners = [results[0].player];
+    for (let i = 1; i < results.length; i++) {
+        if (results[i].handRank === results[0].handRank &&
+            results[i].tieBreaker === results[0].tieBreaker &&
+            JSON.stringify(results[i].values) === JSON.stringify(results[0].values)) {
+            winners.push(results[i].player);
+        } else {
+            break;
+        }
+    }
+
+    return { winners, handName: results[0].handName, results };
+}
+
 function createDeck() {
     const deck = [];
     for (const suit of SUITS) {
@@ -125,11 +228,59 @@ function advancePhase(room) {
     } else if (room.phase === 'river') {
         // 进入摊牌
         room.phase = 'showdown';
-        io.to(room.id).emit('gameEnd', {
-            players: room.players,
-            communityCards: room.communityCards,
-            pot: room.pot
+
+        // 评估手牌，决定赢家
+        const { winners, handName, results } = getWinners(room.players, room.communityCards);
+
+        // 分配奖池
+        const winAmount = Math.floor(room.pot / winners.length);
+        winners.forEach(w => {
+            const player = room.players.find(p => p.id === w.id);
+            if (player) player.chips += winAmount;
         });
+
+        // 发送游戏结束信息
+        io.to(room.id).emit('gameEnd', {
+            players: room.players.map(p => ({
+                id: p.id,
+                name: p.name,
+                chips: p.chips,
+                hand: p.hand,
+                folded: p.folded
+            })),
+            communityCards: room.communityCards,
+            pot: room.pot,
+            winners: winners.map(w => w.id),
+            handName,
+            results: results.map(r => ({
+                playerId: r.player.id,
+                handName: r.handName,
+                handRank: r.handRank
+            }))
+        });
+
+        // 3秒后自动开始下一局
+        setTimeout(() => {
+            // 检查是否还有玩家有足够筹码
+            const eligiblePlayers = room.players.filter(p => p.chips >= room.bigBlind);
+            if (eligiblePlayers.length >= 2) {
+                startNewHand(room);
+                io.to(room.id).emit('gameStart', {
+                    players: room.players.map(p => ({
+                        id: p.id,
+                        name: p.name,
+                        chips: p.chips,
+                        hand: p.hand
+                    })),
+                    dealer: room.dealer,
+                    phase: room.phase,
+                    currentPlayer: room.currentPlayer,
+                    pot: room.pot,
+                    currentBet: room.currentBet
+                });
+            }
+        }, 3000);
+
         return;
     }
 
