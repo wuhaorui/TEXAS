@@ -1021,6 +1021,17 @@
             const isMyTurn = myPlayerIndex === game.currentPlayer;
             const player = game.players[myPlayerIndex];
 
+            // 详细日志：每轮下注都打印是谁的回合
+            const currentPlayerName = game.players[game.currentPlayer]
+                ? game.players[game.currentPlayer].name
+                : '未知';
+            console.log(
+                `%c[下注轮转] 当前: ${currentPlayerName} | ` +
+                `我的索引: ${myPlayerIndex} | 当前下注索引: ${game.currentPlayer} | ` +
+                `是否轮到我: ${isMyTurn} | 阶段: ${game.phase}`,
+                'color: #ffd700; font-weight: bold;'
+            );
+
             const actionsDiv = document.getElementById('action-area');
             const callBtn = document.getElementById('call-btn');
             const checkBtn = document.getElementById('check-btn');
