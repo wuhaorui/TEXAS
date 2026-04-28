@@ -141,7 +141,14 @@ io.on('connection', (socket) => {
             playerId: socket.playerId,
             playerName,
             initialChips,
-            shareUrl: `${baseUrl || ''}?room=${roomId}`
+            shareUrl: `${baseUrl || ''}?room=${roomId}`,
+            players: rooms[roomId].players.map(p => ({
+                id: p.id,
+                name: p.name,
+                chips: p.chips,
+                ready: p.ready,
+                isHost: p.isHost
+            }))
         });
     });
 
@@ -237,7 +244,7 @@ io.on('connection', (socket) => {
 
         player.ready = !player.ready;
 
-        io.to(room.roomId).emit('playerReadyUpdate', {
+        io.to(room.id).emit('playerReadyUpdate', {
             players: room.players.map(p => ({
                 id: p.id,
                 name: p.name,
@@ -300,7 +307,7 @@ io.on('connection', (socket) => {
         room.gameStarted = true;
         startNewHand(room);
 
-        io.to(room.roomId).emit('gameStarted', {
+        io.to(room.id).emit('gameStarted', {
             dealer: room.dealer,
             players: room.players.map(p => ({
                 id: p.id,
@@ -368,7 +375,7 @@ io.on('connection', (socket) => {
             }
         }
 
-        io.to(room.roomId).emit('playerAction', {
+        io.to(room.id).emit('playerAction', {
             playerId: socket.playerId,
             action,
             amount: amount || 0
@@ -385,14 +392,14 @@ io.on('connection', (socket) => {
 
         if (nextPlayer === -1 || room.phase === 'showdown') {
             room.phase = 'showdown';
-            io.to(room.roomId).emit('gameEnd', {
+            io.to(room.id).emit('gameEnd', {
                 players: room.players,
                 communityCards: room.communityCards,
                 pot: room.pot
             });
         } else {
             room.currentPlayer = nextPlayer;
-            io.to(room.roomId).emit('gameUpdate', {
+            io.to(room.id).emit('gameUpdate', {
                 players: room.players.map(p => ({
                     id: p.id,
                     name: p.name,
@@ -434,7 +441,7 @@ io.on('connection', (socket) => {
         player.isHost = false;
         target.isHost = true;
 
-        io.to(room.roomId).emit('newHost', { hostId: targetPlayerId });
+        io.to(room.id).emit('newHost', { hostId: targetPlayerId });
         callback({ success: true });
     });
 
@@ -448,7 +455,7 @@ io.on('connection', (socket) => {
         if (playerIndex === -1) return;
 
         const player = room.players[playerIndex];
-        io.to(room.roomId).emit('playerLeft', { playerId: socket.playerId, playerName: player.name });
+        io.to(room.id).emit('playerLeft', { playerId: socket.playerId, playerName: player.name });
 
         room.players.splice(playerIndex, 1);
 
@@ -456,7 +463,7 @@ io.on('connection', (socket) => {
             delete rooms[socket.roomId];
         } else if (player.isHost) {
             room.players[0].isHost = true;
-            io.to(room.roomId).emit('newHost', { hostId: room.players[0].id });
+            io.to(room.id).emit('newHost', { hostId: room.players[0].id });
         }
     });
 });
