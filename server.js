@@ -320,18 +320,23 @@ function advancePhase(room) {
             const eligiblePlayers = room.players.filter(p => p.chips >= room.bigBlind);
             if (eligiblePlayers.length >= 2) {
                 startNewHand(room);
+                // 发送 gameStarted 事件，确保所有必要字段都包含
                 io.to(room.id).emit('gameStarted', {
                     players: room.players.map(p => ({
                         id: p.id,
                         name: p.name,
                         chips: p.chips,
-                        hand: p.hand
+                        hand: p.hand,
+                        currentBet: p.currentBet,
+                        folded: p.folded
                     })),
                     dealer: room.dealer,
                     phase: room.phase,
                     currentPlayer: room.currentPlayer,
                     pot: room.pot,
-                    currentBet: room.currentBet
+                    currentBet: room.currentBet,
+                    smallBlind: room.smallBlind,
+                    bigBlind: room.bigBlind
                 });
             }
         }, 3000);
