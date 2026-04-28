@@ -131,13 +131,15 @@ function advancePhase(room) {
         return;
     }
 
-    // 设置下一位玩家（从dealer下一位开始）
+    // 设置本阶段第一个行动的玩家（dealer下一位）
     room.currentPlayer = (room.dealer + 1) % room.players.length;
-
-    // 如果下一位玩家已fold或allIn，找下一个
     while (room.players[room.currentPlayer].folded || room.players[room.currentPlayer].allIn) {
         room.currentPlayer = (room.currentPlayer + 1) % room.players.length;
     }
+
+    // 记录本阶段第一个行动的玩家，用于判断一轮是否结束
+    room.phaseFirstPlayer = room.currentPlayer;
+    room.phaseFirstActionDone = false; // 本阶段是否已有玩家行动过
 
     io.to(room.id).emit('gameUpdate', {
         players: room.players.map(p => ({
@@ -448,15 +450,24 @@ io.on('connection', (socket) => {
             }
         }
 
-        // 检查是否所有未fold的玩家都跟注到相同金额（一轮结束）
+        // 标记本阶段已有人行动过
+        if (!room.phaseFirstActionDone) {
+            room.phaseFirstActionDone = true;
+        }
+
+        // 计算已行动的"有效玩家"数（每个未fold且未allIn的玩家至少行动一次）
+        // 正确判断一轮结束：轮回到本阶段第一个玩家，且所有人下注金额相等
         const activePlayers = room.players.filter(p => !p.folded && !p.allIn);
         const allMatched = activePlayers.length > 0 && activePlayers.every(p => p.currentBet === room.currentBet);
 
-        console.log(`[下注后] 动作:${action} 玩家:${player.name} | nextPlayer:${nextPlayer} | allMatched:${allMatched} | activePlayers:${activePlayers.length}`);
+        // 判断是否轮回到了本阶段第一个行动的玩家
+        const backToFirst = (nextPlayer === room.phaseFirstPlayer);
 
-        if (nextPlayer === -1 || allMatched || room.phase === 'showdown') {
+        console.log(`[下注后] 动作:${action} 玩家:${player.name} | nextPlayer:${nextPlayer} | allMatched:${allMatched} | backToFirst:${backToFirst} | phaseFirstActionDone:${room.phaseFirstActionDone}`);
+
+        if (allMatched && backToFirst) {
             // 一轮结束，进入下一阶段
-            console.log('[下注后] 进入下一阶段');
+            console.log('[下注后] 一轮结束，进入下一阶段');
             advancePhase(room);
         } else {
             room.currentPlayer = nextPlayer;

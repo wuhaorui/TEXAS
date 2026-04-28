@@ -37,3 +37,13 @@
 - 公共牌时机：必须等下注轮结束后通过 advancePhase 才能发
 - 发牌顺序：玩家→对手→玩家→对手交替发牌（一人一张交替）
 - Socket.io callback一定要处理返回值
+- Room对象属性：是 `room.id` 不是 `room.roomId`，后者是undefined
+- 下注轮转：需要检查一轮是否结束（allMatched），否则玩家会一直卡住
+- Railway连接：需要添加心跳配置 pingTimeout/pingInterval 防止连接超时
+
+### 多人版界面布局（2026-04）
+- 2-4人：上排横向排列
+- 5-8人：上下两排，dealer位置决定左右分布
+- 位置标识：D(金色Dealer)、SB(红色小盲)、BB(蓝色大盲)
+- 每位玩家手牌显示在自己座位旁（仅自己可见）
+- 公共牌60x87px（大卡），玩家手牌36x52px（小卡）
