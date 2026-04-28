@@ -150,50 +150,99 @@
             align-items: center;
             justify-content: center;
             padding: 40px 20px;
-            min-height: 350px;
+            min-height: 400px;
             position: relative;
         }
 
-        .table-layout { display: flex; flex-direction: column; align-items: center; gap: 20px; width: 100%; }
+        .table-layout {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 15px;
+            width: 100%;
+            position: relative;
+        }
 
-        .players-top { display: flex; justify-content: center; gap: 30px; }
+        /* 玩家环形布局 */
+        .seats-row {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            width: 100%;
+        }
+
+        .seats-row.top { margin-bottom: 20px; }
+        .seats-row.bottom { margin-top: 20px; }
 
         .seat {
             display: flex;
             flex-direction: column;
             align-items: center;
-            gap: 8px;
-            padding: 12px 20px;
-            background: rgba(0, 0, 0, 0.5);
+            gap: 6px;
+            padding: 10px 15px;
+            background: rgba(0, 0, 0, 0.6);
             border-radius: 12px;
-            border: 2px solid rgba(255, 255, 255, 0.1);
-            min-width: 120px;
+            border: 2px solid rgba(255, 255, 255, 0.15);
+            min-width: 110px;
             position: relative;
             transition: all 0.3s;
         }
 
-        .seat.active-turn { border-color: var(--gold-accent); box-shadow: 0 0 20px rgba(212, 175, 55, 0.5); }
+        .seat.active-turn {
+            border-color: var(--gold-accent);
+            box-shadow: 0 0 25px rgba(212, 175, 55, 0.6);
+            transform: scale(1.05);
+        }
 
-        .seat.is-dealer::before {
-            content: 'D';
+        .seat.folded { opacity: 0.5; }
+
+        /* 位置标识 */
+        .position-badge {
             position: absolute;
-            top: -8px;
-            left: -8px;
-            width: 24px;
-            height: 24px;
-            background: var(--gold-accent);
-            color: #1a1a2e;
+            top: -10px;
+            left: -10px;
+            width: 26px;
+            height: 26px;
             border-radius: 50%;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 0.7rem;
+            font-size: 0.65rem;
             font-weight: 700;
+            color: white;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.4);
         }
 
-        .seat-name { font-weight: 600; font-size: 0.95rem; }
-        .seat-chips { font-size: 1rem; font-weight: 700; color: var(--text-gold); }
-        .seat-cards { display: flex; gap: 4px; min-height: 40px; }
+        .position-badge.dealer { background: linear-gradient(145deg, var(--gold-accent), #b8962e); color: #1a1a2e; }
+        .position-badge.sb { background: linear-gradient(145deg, #e74c3c, #c0392b); }
+        .position-badge.bb { background: linear-gradient(145deg, #3498db, #2980b9); }
+
+        .seat-name { font-weight: 600; font-size: 0.9rem; }
+        .seat-chips { font-size: 0.9rem; font-weight: 700; color: var(--text-gold); }
+        .seat-cards { display: flex; gap: 3px; min-height: 36px; justify-content: center; }
+
+        /* 小卡片尺寸 */
+        .seat-cards .card {
+            width: 36px;
+            height: 52px;
+            font-size: 0.6rem;
+        }
+        .seat-cards .card-corner { font-size: 0.55rem; }
+        .seat-cards .card-corner.top { top: 2px; left: 3px; }
+        .seat-cards .card-corner.bottom { bottom: 2px; right: 3px; }
+        .seat-cards .card-suit { font-size: 0.6rem; }
+        .seat-cards .card-center { font-size: 1rem; }
+
+        /* 公共牌更大 */
+        .community-cards .card {
+            width: 60px;
+            height: 87px;
+        }
+        .community-cards .card-corner { font-size: 0.8rem; }
+        .community-cards .card-corner.top { top: 4px; left: 6px; }
+        .community-cards .card-corner.bottom { bottom: 4px; right: 6px; }
+        .community-cards .card-suit { font-size: 1rem; }
+        .community-cards .card-center { font-size: 1.7rem; }
 
         .community-area { display: flex; flex-direction: column; align-items: center; gap: 10px; }
         .community-label { font-family: 'Cinzel', serif; font-size: 0.85rem; color: rgba(255, 255, 255, 0.6); letter-spacing: 2px; }
@@ -213,14 +262,14 @@
         .pot-amount { font-size: 1.4rem; font-weight: 700; color: var(--text-gold); font-family: 'Cinzel', serif; }
 
         .player-hand-area {
-            margin-top: 20px;
-            padding: 20px;
+            margin-top: 15px;
+            padding: 15px;
             background: rgba(0, 0, 0, 0.5);
             border-radius: 16px;
             display: flex;
             flex-direction: column;
             align-items: center;
-            gap: 15px;
+            gap: 12px;
         }
 
         .hand-label { font-family: 'Cinzel', serif; font-size: 0.9rem; color: rgba(255, 255, 255, 0.6); letter-spacing: 2px; }
@@ -501,8 +550,10 @@
 
                 <div class="game-table">
                     <div class="table-layout">
-                        <div class="players-top" id="players-top"></div>
+                        <!-- 上方玩家 -->
+                        <div class="seats-row top" id="seats-top"></div>
 
+                        <!-- 公共牌区域 -->
                         <div class="community-area">
                             <div class="community-label">公共牌</div>
                             <div class="community-cards" id="community-cards">
@@ -514,20 +565,19 @@
                             </div>
                         </div>
 
+                        <!-- 底池 -->
                         <div class="pot-area">
                             <span class="pot-label">底池:</span>
                             <span class="pot-amount" id="pot-amount">0</span>
                         </div>
+
+                        <!-- 下方玩家 -->
+                        <div class="seats-row bottom" id="seats-bottom"></div>
                     </div>
                 </div>
 
+                <!-- 操作区域 -->
                 <div class="player-hand-area" id="player-hand-area">
-                    <div class="hand-label">你的手牌</div>
-                    <div class="hand-cards" id="player-hand">
-                        <div class="card face-down"></div>
-                        <div class="card face-down"></div>
-                    </div>
-
                     <div class="info-panel">
                         <div class="info-item">
                             <span class="label">当前下注:</span>
@@ -826,22 +876,55 @@
             game.players = data.players;
             game.currentPlayer = data.currentPlayer;
             game.phase = data.phase;
+            game.dealer = data.dealer;
 
             document.getElementById('pot-amount').textContent = data.pot.toLocaleString();
 
-            // 更新座位
-            const playersTop = document.getElementById('players-top');
-            playersTop.innerHTML = '';
+            // 计算 SB/BB 位置
+            const playerCount = data.players.length;
+            const dealerIdx = data.dealer;
+            const sbIdx = (dealerIdx + 1) % playerCount;
+            const bbIdx = (dealerIdx + 2) % playerCount;
 
-            data.players.forEach((player, index) => {
+            // 环形排列：把玩家分成上下两排
+            // 假设最多8人，上排4人，下排4人
+            const topRow = [];
+            const bottomRow = [];
+
+            if (playerCount <= 4) {
+                // 4人或以下：全部在上排
+                for (let i = 0; i < playerCount; i++) {
+                    topRow.push(i);
+                }
+            } else {
+                // 5-8人：平分上下排
+                const half = Math.ceil(playerCount / 2);
+                for (let i = 0; i < playerCount; i++) {
+                    if (i < half) {
+                        topRow.push(i);
+                    } else {
+                        bottomRow.push(i);
+                    }
+                }
+            }
+
+            // 渲染座位
+            function renderSeat(player, index, posType) {
                 const isMe = player.id === game.playerId;
-                const isActive = index === data.currentPlayer && game.phase !== 'waiting';
+                const isActive = index === data.currentPlayer && game.phase !== 'waiting' && game.phase !== 'showdown';
+                const isDealer = index === dealerIdx;
+                const isSB = index === sbIdx;
+                const isBB = index === bbIdx;
+                const isFolded = player.folded;
 
-                const seat = document.createElement('div');
-                seat.className = `seat ${index === data.dealer ? 'is-dealer' : ''} ${isActive ? 'active-turn' : ''}`;
+                let positionBadges = '';
+                if (isDealer) positionBadges += '<div class="position-badge dealer">D</div>';
+                if (isSB) positionBadges += '<div class="position-badge sb">SB</div>';
+                if (isBB) positionBadges += '<div class="position-badge bb">BB</div>';
 
                 let cardsHtml = '';
                 if (player.hand && player.hand.length > 0) {
+                    // 手牌只显示给自己的，其他人显示背面
                     if (isMe || game.phase === 'showdown') {
                         cardsHtml = player.hand.map(c => `
                             <div class="card ${c.suit === '♥' || c.suit === '♦' ? 'red' : 'black'}">
@@ -851,34 +934,63 @@
                             </div>
                         `).join('');
                     } else {
-                        cardsHtml = '<div class="card face-down"></div>'.repeat(player.hand.length);
+                        cardsHtml = '<div class="card face-down"></div><div class="card face-down"></div>';
                     }
+                } else {
+                    cardsHtml = '<div class="card face-down"></div><div class="card face-down"></div>';
                 }
 
-                seat.innerHTML = `
-                    <div class="seat-name">${player.name}${isMe ? ' (你)' : ''}</div>
-                    <div class="seat-cards">${cardsHtml}</div>
-                    <div class="seat-chips">${player.chips.toLocaleString()}</div>
+                let seatClass = 'seat';
+                if (isActive) seatClass += ' active-turn';
+                if (isFolded) seatClass += ' folded';
+
+                return `
+                    <div class="${seatClass}" data-index="${index}">
+                        ${positionBadges}
+                        <div class="seat-name">${player.name}${isMe ? ' (你)' : ''}</div>
+                        <div class="seat-cards">${cardsHtml}</div>
+                        <div class="seat-chips">${player.chips.toLocaleString()}</div>
+                    </div>
                 `;
-                playersTop.appendChild(seat);
+            }
 
-                if (isMe) {
-                    game.myChips = player.chips;
-                    document.getElementById('player-balance').textContent = player.chips.toLocaleString();
+            // 渲染上排
+            const topEl = document.getElementById('seats-top');
+            if (topRow.length === 0) {
+                topEl.innerHTML = '';
+            } else if (playerCount <= 4) {
+                // 2-4人：横向排列
+                topEl.innerHTML = topRow.map(idx => renderSeat(data.players[idx], idx, 'top')).join('');
+                topEl.style.justifyContent = playerCount === 2 ? 'center' : 'center';
+                topEl.style.gap = playerCount === 2 ? '80px' : '30px';
+            } else {
+                // 5-8人：左右散开，中间留空给公共牌
+                const leftSide = topRow.slice(0, Math.ceil(topRow.length / 2));
+                const rightSide = topRow.slice(Math.ceil(topRow.length / 2));
+                topEl.innerHTML = '<div style="display:flex;gap:30px;">' +
+                    leftSide.map(idx => renderSeat(data.players[idx], idx, 'top')).join('') +
+                    '<div style="width:120px"></div>' +
+                    rightSide.map(idx => renderSeat(data.players[idx], idx, 'top')).join('') +
+                    '</div>';
+            }
 
-                    if (player.hand && player.hand.length > 0) {
-                        const handCards = document.querySelectorAll('#player-hand .card');
-                        player.hand.forEach((c, i) => {
-                            handCards[i].className = `card ${c.suit === '♥' || c.suit === '♦' ? 'red' : 'black'} dealing`;
-                            handCards[i].innerHTML = `
-                                <div class="card-corner top">${c.rank}<br><span class="card-suit">${c.suit}</span></div>
-                                <div class="card-center card-suit">${c.suit}</div>
-                                <div class="card-corner bottom">${c.rank}<br><span class="card-suit">${c.suit}</span></div>
-                            `;
-                        });
-                    }
-                }
-            });
+            // 渲染下排
+            const bottomEl = document.getElementById('seats-bottom');
+            if (bottomRow.length === 0) {
+                bottomEl.innerHTML = '';
+            } else {
+                // 下排：从左到右排列
+                bottomEl.innerHTML = bottomRow.map(idx => renderSeat(data.players[idx], idx, 'bottom')).join('');
+                bottomEl.style.justifyContent = 'center';
+                bottomEl.style.gap = '30px';
+            }
+
+            // 更新我的筹码
+            const myPlayer = data.players.find(p => p.id === game.playerId);
+            if (myPlayer) {
+                game.myChips = myPlayer.chips;
+                document.getElementById('player-balance').textContent = myPlayer.chips.toLocaleString();
+            }
 
             // 更新公共牌
             const communityCards = document.querySelectorAll('#community-cards .card');
