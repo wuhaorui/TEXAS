@@ -491,6 +491,25 @@
             background: #8e44ad;
         }
 
+        .ready-btn {
+            min-width: 120px;
+            background: linear-gradient(145deg, #95a5a6, #7f8c8d);
+        }
+
+        .ready-btn.is-ready {
+            background: linear-gradient(145deg, #27ae60, #1e8449);
+        }
+
+        .ready-badge {
+            background: #27ae60;
+            color: white;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 0.7rem;
+            font-weight: 600;
+            margin-left: 5px;
+        }
+
         /* 模态框 */
         .modal-overlay { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, 0.85); z-index: 1000; align-items: center; justify-content: center; }
         .modal-overlay.active { display: flex; }
@@ -651,7 +670,10 @@
                 </div>
                 <p class="waiting-text">等待其他玩家加入...</p>
                 <div class="players-list" id="game-players-list"></div>
-                <button type="button" class="btn btn-secondary start-game-btn" id="start-game-btn" onclick="startGame(); return false;" style="margin-top: 20px; display: none;">
+                <button type="button" class="btn btn-secondary ready-btn" id="ready-btn" onclick="toggleReady()" style="margin-top: 15px;">
+                    准备
+                </button>
+                <button type="button" class="btn btn-secondary start-game-btn" id="start-game-btn" onclick="startGame(); return false;" style="margin-top: 15px; display: none;">
                     开始游戏
                 </button>
             </div>
@@ -826,10 +848,41 @@
             // 更新游戏中的玩家列表
             updateGamePlayers(data.players);
 
-            // 控制开始按钮（至少2人才能开始，且仅房主可见）
+            // 更新准备按钮状态
+            const myPlayer = data.players.find(p => p.id === game.playerId);
+            if (myPlayer) {
+                updateReadyButton(myPlayer.ready);
+            }
+
+            // 控制开始按钮（至少2人且全部准备才能开始）
             const startBtn = document.getElementById('start-game-btn');
             if (startBtn && game.isHost) {
-                if (data.players.length >= 2) {
+                if (data.players.length >= 2 && checkAllReady(data.players)) {
+                    startBtn.style.display = 'inline-block';
+                    startBtn.disabled = false;
+                    startBtn.style.opacity = '1';
+                } else {
+                    startBtn.style.display = 'inline-block';
+                    startBtn.disabled = true;
+                    startBtn.style.opacity = '0.5';
+                }
+            }
+        });
+
+        // 玩家准备状态更新
+        socket.on('playerReadyUpdate', (data) => {
+            updateGamePlayers(data.players);
+
+            // 更新准备按钮状态
+            const myPlayer = data.players.find(p => p.id === game.playerId);
+            if (myPlayer) {
+                updateReadyButton(myPlayer.ready);
+            }
+
+            // 控制开始按钮
+            const startBtn = document.getElementById('start-game-btn');
+            if (startBtn && game.isHost) {
+                if (data.players.length >= 2 && checkAllReady(data.players)) {
                     startBtn.style.display = 'inline-block';
                     startBtn.disabled = false;
                     startBtn.style.opacity = '1';
@@ -1004,7 +1057,7 @@ function updateGamePlayers(players) {
             if (list) {
                 list.innerHTML = players.map(p => `
                     <div class="player-item">
-                        <span class="name">${p.name}${p.isHost ? '<span class="host-badge">房主</span>' : ''}</span>
+                        <span class="name">${p.name}${p.isHost ? '<span class="host-badge">房主</span>' : ''}${p.ready && !p.isHost ? '<span class="ready-badge">已准备</span>' : ''}</span>
                         <span class="chips">${p.chips}</span>
                         ${game.isHost && !p.isHost && p.id !== game.playerId ? `<button class="transfer-host-btn" onclick="transferHost('${p.id}')">转让</button>` : ''}
                     </div>
@@ -1114,6 +1167,34 @@ function updateGamePlayers(players) {
                     alert(response.error || '转让失败');
                 }
             });
+        }
+
+        function toggleReady() {
+            socket.emit('playerReady', {}, (response) => {
+                if (!response.success) {
+                    alert(response.error || '操作失败');
+                } else {
+                    updateReadyButton(response.ready);
+                }
+            });
+        }
+
+        function updateReadyButton(isReady) {
+            const readyBtn = document.getElementById('ready-btn');
+            if (readyBtn) {
+                if (isReady) {
+                    readyBtn.textContent = '已准备';
+                    readyBtn.classList.add('is-ready');
+                } else {
+                    readyBtn.textContent = '准备';
+                    readyBtn.classList.remove('is-ready');
+                }
+            }
+        }
+
+        function checkAllReady(players) {
+            if (!players || players.length < 2) return false;
+            return players.every(p => p.ready);
         }
 
         // 键盘快捷键

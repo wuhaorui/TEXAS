@@ -199,7 +199,8 @@ io.on('connection', (socket) => {
             currentBet: 0,
             folded: false,
             allIn: false,
-            isHost: true
+            isHost: true,
+            ready: false
         };
 
         rooms[roomId].players.push(player);
@@ -253,7 +254,8 @@ io.on('connection', (socket) => {
             currentBet: 0,
             folded: false,
             allIn: false,
-            isHost: false
+            isHost: false,
+            ready: false
         };
 
         room.players.push(player);
@@ -263,8 +265,8 @@ io.on('connection', (socket) => {
 
         // 通知房间内其他人
         io.to(roomId).emit('playerJoined', {
-            player: { id: player.id, name: player.name, chips: player.chips },
-            players: room.players.map(p => ({ id: p.id, name: p.name, chips: p.chips }))
+            player: { id: player.id, name: player.name, chips: player.chips, ready: player.ready },
+            players: room.players.map(p => ({ id: p.id, name: p.name, chips: p.chips, ready: p.ready, isHost: p.isHost }))
         });
 
         callback({
@@ -308,6 +310,14 @@ io.on('connection', (socket) => {
         if (room.players.length < MIN_PLAYERS) {
             console.log('FAIL: Not enough players');
             callback({ success: false, error: `至少需要 ${MIN_PLAYERS} 名玩家，当前 ${room.players.length} 人` });
+            return;
+        }
+
+        // 检查所有玩家是否已准备
+        const notReadyPlayers = room.players.filter(p => !p.ready);
+        if (notReadyPlayers.length > 0) {
+            console.log('FAIL: Not all players ready');
+            callback({ success: false, error: `还有玩家未准备: ${notReadyPlayers.map(p => p.name).join(', ')}` });
             return;
         }
 
@@ -672,6 +682,35 @@ io.on('connection', (socket) => {
 
         io.to(room.roomId).emit('newHost', { hostId: targetPlayerId });
         callback({ success: true });
+    });
+
+    // 玩家准备/取消准备
+    socket.on('playerReady', (data, callback) => {
+        const room = rooms[socket.roomId];
+        if (!room) {
+            callback({ success: false, error: '房间不存在' });
+            return;
+        }
+
+        const player = room.players.find(p => p.id === socket.playerId);
+        if (!player) {
+            callback({ success: false, error: '玩家不存在' });
+            return;
+        }
+
+        // 游戏已开始后不能取消准备
+        if (room.gameStarted) {
+            callback({ success: false, error: '游戏已开始' });
+            return;
+        }
+
+        player.ready = !player.ready; // 切换准备状态
+
+        io.to(room.roomId).emit('playerReadyUpdate', {
+            players: room.players.map(p => ({ id: p.id, name: p.name, chips: p.chips, ready: p.ready, isHost: p.isHost }))
+        });
+
+        callback({ success: true, ready: player.ready });
     });
 });
 
