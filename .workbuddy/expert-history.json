@@ -8,10 +8,19 @@
         "profession": "高级开发工程师",
         "avatarUrl": "https://acc-1258344699.cos.accelerate.myqcloud.com/workbuddy/experts/avatars/02-Engineering/SeniorDeveloper/SeniorDeveloper.png",
         "promptUrl": "https://acc-1258344699.cos.accelerate.myqcloud.com/workbuddy/experts/experts/02-Engineering/SeniorDeveloper/SeniorDeveloper_zh.md",
-        "usedAt": 1777263688222,
+        "usedAt": 1777350763166,
+        "industryId": "02-Engineering"
+      },
+      {
+        "expertId": "SoftwareArchitect",
+        "name": "架构通",
+        "profession": "软件架构师",
+        "avatarUrl": "https://acc-1258344699.cos.accelerate.myqcloud.com/workbuddy/experts/avatars/02-Engineering/SoftwareArchitect/SoftwareArchitect.png",
+        "promptUrl": "https://acc-1258344699.cos.accelerate.myqcloud.com/workbuddy/experts/experts/02-Engineering/SoftwareArchitect/SoftwareArchitect_zh.md",
+        "usedAt": 1777350655818,
         "industryId": "02-Engineering"
       }
     ]
   },
-  "lastUpdated": 1777350372807
+  "lastUpdated": 1777350824274
 }
