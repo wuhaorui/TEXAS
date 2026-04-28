@@ -476,6 +476,21 @@
             min-width: 200px;
         }
 
+        .transfer-host-btn {
+            padding: 4px 10px;
+            font-size: 0.75rem;
+            background: #9b59b6;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-left: 8px;
+        }
+
+        .transfer-host-btn:hover {
+            background: #8e44ad;
+        }
+
         /* 模态框 */
         .modal-overlay { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, 0.85); z-index: 1000; align-items: center; justify-content: center; }
         .modal-overlay.active { display: flex; }
@@ -886,6 +901,14 @@
 
         socket.on('newHost', (data) => {
             game.isHost = data.hostId === game.playerId;
+            // 更新本地玩家数据中的 isHost 状态
+            if (game.players) {
+                game.players.forEach(p => {
+                    p.isHost = p.id === data.hostId;
+                });
+                updateGamePlayers(game.players);
+            }
+            alert(game.isHost ? '你已成为新房主！' : '房主已更换');
         });
 
         function updateGameState(data) {
@@ -974,7 +997,7 @@
             enableActions(data);
         }
 
-        function updateGamePlayers(players) {
+function updateGamePlayers(players) {
             if (!players) return;
 
             const list = document.getElementById('game-players-list');
@@ -983,10 +1006,10 @@
                     <div class="player-item">
                         <span class="name">${p.name}${p.isHost ? '<span class="host-badge">房主</span>' : ''}</span>
                         <span class="chips">${p.chips}</span>
+                        ${game.isHost && !p.isHost && p.id !== game.playerId ? `<button class="transfer-host-btn" onclick="transferHost('${p.id}')">转让</button>` : ''}
                     </div>
                 `).join('');
             }
-        }
 
         function enableActions(data) {
             const myPlayerIndex = game.players.findIndex(p => p.id === game.playerId);
@@ -1081,6 +1104,16 @@
 
         function closeModal() {
             document.getElementById('result-modal').classList.remove('active');
+        }
+
+        function transferHost(targetPlayerId) {
+            if (!confirm('确定要转让房主给这位玩家吗？')) return;
+
+            socket.emit('transferHost', { targetPlayerId }, (response) => {
+                if (!response.success) {
+                    alert(response.error || '转让失败');
+                }
+            });
         }
 
         // 键盘快捷键

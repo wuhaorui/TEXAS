@@ -645,6 +645,34 @@ io.on('connection', (socket) => {
             }
         }
     });
+
+    // 转让房主
+    socket.on('transferHost', (data, callback) => {
+        const room = rooms[socket.roomId];
+        if (!room) {
+            callback({ success: false, error: '房间不存在' });
+            return;
+        }
+
+        const currentPlayer = room.players.find(p => p.id === socket.playerId);
+        if (!currentPlayer || !currentPlayer.isHost) {
+            callback({ success: false, error: '只有房主可以转让' });
+            return;
+        }
+
+        const { targetPlayerId } = data;
+        const targetPlayer = room.players.find(p => p.id === targetPlayerId);
+        if (!targetPlayer) {
+            callback({ success: false, error: '目标玩家不存在' });
+            return;
+        }
+
+        currentPlayer.isHost = false;
+        targetPlayer.isHost = true;
+
+        io.to(room.roomId).emit('newHost', { hostId: targetPlayerId });
+        callback({ success: true });
+    });
 });
 
 const PORT = process.env.PORT || 3000;
