@@ -129,9 +129,9 @@ function evaluateHand(cards) {
     } else if (c1 === 2 && c2 === 2) {
         handName = '两对';
         handRank = HAND_RANKS[handName];
-        tieBreaker = Math.max(parseInt(v1), parseInt(v2));
+        tieBreaker = parseInt(v1); // v1 是高对（排序时值大的在前）
         const kick = values.find(v => v !== parseInt(v1) && v !== parseInt(v2));
-        bestValues = [Math.max(parseInt(v1), parseInt(v2)), Math.min(parseInt(v1), parseInt(v2)), Math.max(parseInt(v1), parseInt(v2)), Math.min(parseInt(v1), parseInt(v2)), kick || 0];
+        bestValues = [parseInt(v1), parseInt(v1), parseInt(v2), parseInt(v2), kick || 0];
     } else if (c1 === 2) {
         handName = '一对';
         handRank = HAND_RANKS[handName];
