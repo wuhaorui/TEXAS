@@ -543,6 +543,7 @@ io.on('connection', (socket) => {
     socket.on('bet', (data, callback) => {
         const room = rooms[socket.roomId];
         if (!room) {
+            console.log('[bet] 房间不存在! socket.roomId:', socket.roomId, 'socket.id:', socket.id);
             callback({ success: false, error: '房间不存在' });
             return;
         }
