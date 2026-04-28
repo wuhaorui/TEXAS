@@ -98,6 +98,7 @@ function startNewHand(room) {
     room.currentBet = room.bigBlind;
     room.currentPlayer = (bbIndex + 1) % room.players.length;
     room.phase = 'preflop';
+    room.actedThisPhase = new Set(); // 重置本阶段已行动玩家
 }
 
 // 进入下一阶段
@@ -105,6 +106,7 @@ function advancePhase(room) {
     // 重置本轮下注
     room.currentBet = 0;
     room.players.forEach(p => p.currentBet = 0);
+    room.actedThisPhase = new Set(); // 重置本阶段已行动玩家
 
     if (room.phase === 'preflop') {
         // 翻牌圈：发3张公共牌
@@ -136,10 +138,6 @@ function advancePhase(room) {
     while (room.players[room.currentPlayer].folded || room.players[room.currentPlayer].allIn) {
         room.currentPlayer = (room.currentPlayer + 1) % room.players.length;
     }
-
-    // 记录本阶段第一个行动的玩家，用于判断一轮是否结束
-    room.phaseFirstPlayer = room.currentPlayer;
-    room.phaseFirstActionDone = false; // 本阶段是否已有玩家行动过
 
     io.to(room.id).emit('gameUpdate', {
         players: room.players.map(p => ({
@@ -406,6 +404,9 @@ io.on('connection', (socket) => {
         const { action, amount } = data;
         const player = room.players[playerIndex];
 
+        // 记录当前注额，用于判断是否有加注
+        room.previousBet = room.currentBet;
+
         if (action === 'fold') {
             player.folded = true;
         } else if (action === 'call') {
@@ -440,6 +441,18 @@ io.on('connection', (socket) => {
             amount: amount || 0
         });
 
+        // 记录本阶段已行动的玩家
+        room.actedThisPhase.add(playerIndex);
+
+        // 如果有人下注/加注/全下（提高了当前注额），重置其他玩家的已行动标记
+        // 这样其他玩家需要再次行动来跟注或加注
+        const betActions = ['bet', 'raise', 'allin'];
+        if (betActions.includes(action) && room.currentBet > (room.previousBet || 0)) {
+            // 重置其他玩家的已行动标记（当前玩家已记录）
+            room.actedThisPhase.clear();
+            room.actedThisPhase.add(playerIndex);
+        }
+
         // 计算下一个可以行动的玩家
         let nextPlayer = -1;
         for (let i = 1; i < room.players.length; i++) {
@@ -450,23 +463,22 @@ io.on('connection', (socket) => {
             }
         }
 
-        // 标记本阶段已有人行动过
-        if (!room.phaseFirstActionDone) {
-            room.phaseFirstActionDone = true;
-        }
-
-        // 计算已行动的"有效玩家"数（每个未fold且未allIn的玩家至少行动一次）
-        // 正确判断一轮结束：轮回到本阶段第一个玩家，且所有人下注金额相等
+        // 判断一轮是否结束：
+        // 1. 所有active玩家下注金额相等
+        // 2. 所有active玩家都已行动过（或无法行动）
         const activePlayers = room.players.filter(p => !p.folded && !p.allIn);
         const allMatched = activePlayers.length > 0 && activePlayers.every(p => p.currentBet === room.currentBet);
+        const allActed = activePlayers.every(p => room.actedThisPhase.has(room.players.indexOf(p)));
 
-        // 判断是否轮回到了本阶段第一个行动的玩家
-        const backToFirst = (nextPlayer === room.phaseFirstPlayer);
+        console.log(`[下注后] 动作:${action} 玩家:${player.name} | nextPlayer:${nextPlayer} | allMatched:${allMatched} | allActed:${allActed} | acted:${[...room.actedThisPhase]}`);
 
-        console.log(`[下注后] 动作:${action} 玩家:${player.name} | nextPlayer:${nextPlayer} | allMatched:${allMatched} | backToFirst:${backToFirst} | phaseFirstActionDone:${room.phaseFirstActionDone}`);
-
-        if (allMatched && backToFirst) {
-            // 一轮结束，进入下一阶段
+        // 情况1：没有可行动玩家了（都fold或allIn），直接进入下一阶段
+        if (nextPlayer === -1) {
+            console.log('[下注后] 没有可行动玩家，进入下一阶段');
+            advancePhase(room);
+        }
+        // 情况2：所有active玩家都已行动，且下注金额相等，一轮结束
+        else if (allMatched && allActed) {
             console.log('[下注后] 一轮结束，进入下一阶段');
             advancePhase(room);
         } else {
