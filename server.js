@@ -239,7 +239,7 @@ function advancePhase(room) {
             if (player) player.chips += winAmount;
         });
 
-        // 发送游戏结束信息
+        // 发送游戏结束信息（注意：此时 room.dealer 还是当前局的，下一局会+1）
         io.to(room.id).emit('gameEnd', {
             players: room.players.map(p => ({
                 id: p.id,
@@ -256,7 +256,8 @@ function advancePhase(room) {
                 playerId: r.player.id,
                 handName: r.handName,
                 handRank: r.handRank
-            }))
+            })),
+            dealer: room.dealer // 发送当前 dealer 位置，前端用于显示位置标识
         });
 
         // 3秒后自动开始下一局
@@ -265,7 +266,7 @@ function advancePhase(room) {
             const eligiblePlayers = room.players.filter(p => p.chips >= room.bigBlind);
             if (eligiblePlayers.length >= 2) {
                 startNewHand(room);
-                io.to(room.id).emit('gameStart', {
+                io.to(room.id).emit('gameStarted', {
                     players: room.players.map(p => ({
                         id: p.id,
                         name: p.name,

@@ -855,6 +855,11 @@
             console.log('游戏开始!', data);
             document.getElementById('waiting-section').style.display = 'none';
             document.getElementById('playing-area').style.display = 'block';
+
+            // 显示新对局开始的提示
+            const dealerSeat = data.players[data.dealer];
+            alert(`🃏 新对局开始！\n\nDealer: ${dealerSeat.name}\n小盲: ${data.players[(data.dealer + 1) % data.players.length].name}\n大盲: ${data.players[(data.dealer + 2) % data.players.length].name}`);
+
             updateGameState(data);
         });
 
@@ -885,7 +890,8 @@
                 message += `\n💰 奖池: ${data.pot.toLocaleString()} 筹码\n`;
             }
 
-            // 更新玩家筹码显示
+            // 更新游戏状态（包括 dealer 位置，用于显示 SB/BB/D 标识）
+            game.dealer = data.dealer;
             game.players = data.players;
             updateGameState(data);
 
