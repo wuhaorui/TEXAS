@@ -667,6 +667,15 @@
     <script>
         const socket = io();
 
+        // 断线重连后自动恢复房间状态
+        socket.on('connect', () => {
+            // 如果已经在游戏中（有房间信息），自动重新加入
+            if (game.roomId && game.playerName && game.playerId) {
+                console.log('[重连] socket 重新连接，正在恢复房间状态...');
+                rejoinRoom(game.roomId, game.playerName, game.playerId);
+            }
+        });
+
         // 游戏状态
         const game = {
             playerId: null,
