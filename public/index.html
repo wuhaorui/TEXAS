@@ -1230,6 +1230,10 @@
             const isMyTurn = myPlayerIndex === game.currentPlayer;
             const player = game.players[myPlayerIndex];
 
+            // 调试日志：打印 data 和 player 的关键字段
+            console.log('[enableActions] data.currentBet:', data.currentBet, '| player:', player);
+            console.log('[enableActions] player.currentBet:', player ? player.currentBet : 'N/A');
+
             // 详细日志：每轮下注都打印是谁的回合
             const currentPlayerName = game.players[game.currentPlayer]
                 ? game.players[game.currentPlayer].name
@@ -1260,8 +1264,13 @@
 
             actionsDiv.style.display = 'flex';
 
-            const toCall = data.currentBet - player.currentBet;
-            document.getElementById('current-bet').textContent = player.currentBet;
+            // 防御性处理：currentBet 可能为 undefined
+            const dataCurrentBet = data.currentBet || 0;
+            const playerCurrentBet = player.currentBet || 0;
+            const toCall = dataCurrentBet - playerCurrentBet;
+            console.log(`[enableActions] toCall计算: data.currentBet=${data.currentBet}(${typeof data.currentBet}) - player.currentBet=${player.currentBet}(${typeof player.currentBet}) = ${toCall}`);
+
+            document.getElementById('current-bet').textContent = playerCurrentBet;
             document.getElementById('to-call').textContent = toCall;
 
             if (toCall <= 0) {
