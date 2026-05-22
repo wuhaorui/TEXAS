@@ -260,6 +260,62 @@ function startNewHand(room) {
 
 // 进入下一阶段
 function advancePhase(room) {
+    // 如果只剩一个未弃牌玩家，跳过所有阶段直接判胜（安全网）
+    const nonFolded = room.players.filter(p => !p.folded);
+    if (nonFolded.length === 1) {
+        console.log('[advancePhase] 只剩一人未弃牌，直接判胜');
+        const winner = nonFolded[0];
+        winner.chips += room.pot;
+        room.pot = 0;
+        room.phase = 'showdown';
+        io.to(room.id).emit('gameEnd', {
+            players: room.players.map(p => ({
+                id: p.id,
+                name: p.name,
+                chips: p.chips,
+                hand: p.hand,
+                folded: p.folded
+            })),
+            communityCards: room.communityCards,
+            pot: 0,
+            winners: [winner.id],
+            handName: '对手全弃牌',
+            results: room.players
+                .filter(p => !p.folded)
+                .map(p => ({
+                    playerId: p.id,
+                    handName: '对手全弃牌',
+                    handRank: 0
+                })),
+            dealer: room.dealer
+        });
+
+        setTimeout(() => {
+            const eligiblePlayers = room.players.filter(p => p.chips >= room.bigBlind);
+            if (eligiblePlayers.length >= 2) {
+                startNewHand(room);
+                io.to(room.id).emit('gameStarted', {
+                    players: room.players.map(p => ({
+                        id: p.id,
+                        name: p.name,
+                        chips: p.chips,
+                        hand: p.hand,
+                        currentBet: p.currentBet,
+                        folded: p.folded
+                    })),
+                    dealer: room.dealer,
+                    phase: room.phase,
+                    currentPlayer: room.currentPlayer,
+                    pot: room.pot,
+                    currentBet: room.currentBet,
+                    smallBlind: room.smallBlind,
+                    bigBlind: room.bigBlind
+                });
+            }
+        }, 3000);
+        return;
+    }
+
     // 重置本轮下注
     room.currentBet = 0;
     room.players.forEach(p => p.currentBet = 0);
@@ -737,6 +793,65 @@ io.on('connection', (socket) => {
 
         // 记录本阶段已行动的玩家
         room.actedThisPhase.add(playerIndex);
+
+        // 检查是否只剩一个未弃牌玩家（其他人全弃牌），直接判胜
+        const nonFolded = room.players.filter(p => !p.folded);
+        if (nonFolded.length === 1) {
+            const winner = nonFolded[0];
+            winner.chips += room.pot;
+            room.pot = 0;
+            room.phase = 'showdown';
+
+            io.to(room.id).emit('gameEnd', {
+                players: room.players.map(p => ({
+                    id: p.id,
+                    name: p.name,
+                    chips: p.chips,
+                    hand: p.hand,
+                    folded: p.folded
+                })),
+                communityCards: room.communityCards,
+                pot: 0,
+                winners: [winner.id],
+                handName: '对手全弃牌',
+                results: room.players
+                    .filter(p => !p.folded)
+                    .map(p => ({
+                        playerId: p.id,
+                        handName: '对手全弃牌',
+                        handRank: 0
+                    })),
+                dealer: room.dealer
+            });
+
+            // 3秒后自动开始下一局
+            setTimeout(() => {
+                const eligiblePlayers = room.players.filter(p => p.chips >= room.bigBlind);
+                if (eligiblePlayers.length >= 2) {
+                    startNewHand(room);
+                    io.to(room.id).emit('gameStarted', {
+                        players: room.players.map(p => ({
+                            id: p.id,
+                            name: p.name,
+                            chips: p.chips,
+                            hand: p.hand,
+                            currentBet: p.currentBet,
+                            folded: p.folded
+                        })),
+                        dealer: room.dealer,
+                        phase: room.phase,
+                        currentPlayer: room.currentPlayer,
+                        pot: room.pot,
+                        currentBet: room.currentBet,
+                        smallBlind: room.smallBlind,
+                        bigBlind: room.bigBlind
+                    });
+                }
+            }, 3000);
+
+            callback({ success: true });
+            return;
+        }
 
         // 如果有人下注/加注/全下（提高了当前注额），重置其他玩家的已行动标记
         // 这样其他玩家需要再次行动来跟注或加注

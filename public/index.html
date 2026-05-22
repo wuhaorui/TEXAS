@@ -763,9 +763,19 @@
         }
 
         // 检查是否可以重新加入
+        // 如果有 URL room 参数，优先用 URL room，忽略 localStorage 旧房间
         setTimeout(() => {
             if (!game.roomId) {
-                checkRejoin();
+                if (roomFromUrl) {
+                    // 有 URL 房间号：不弹 checkRejoin 的 localStorage 旧房间确认框
+                    const savedPlayerName = localStorage.getItem('texas_playerName') || '';
+                    if (savedPlayerName) {
+                        document.getElementById('join-player-name').value = savedPlayerName;
+                    }
+                    rejoinRoom(roomFromUrl, savedPlayerName || '玩家' + Math.floor(Math.random() * 1000), localStorage.getItem('texas_playerId'));
+                } else {
+                    checkRejoin();
+                }
             }
         }, 500);
 
