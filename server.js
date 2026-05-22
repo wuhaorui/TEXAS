@@ -791,7 +791,8 @@ io.on('connection', (socket) => {
                 pot: room.pot,
                 currentBet: room.currentBet,
                 currentPlayer: room.currentPlayer,
-                phase: room.phase
+                phase: room.phase,
+                dealer: room.dealer
             });
         }
 

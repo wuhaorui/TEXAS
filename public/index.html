@@ -1066,7 +1066,7 @@
             }
 
             // 更新游戏状态（包括 dealer 位置，用于显示 SB/BB/D 标识）
-            game.dealer = data.dealer;
+            game.dealer = data.dealer !== undefined ? data.dealer : game.dealer;
             game.players = data.players;
             updateGameState(data);
 
@@ -1083,7 +1083,7 @@
             game.players = data.players;
             game.currentPlayer = data.currentPlayer;
             game.phase = data.phase;
-            game.dealer = data.dealer;
+            game.dealer = data.dealer !== undefined ? data.dealer : game.dealer;
 
             console.log('[updateGameState] dealer:', data.dealer, 'dealerIdx will be:', data.dealer, 'phase:', data.phase);
 
