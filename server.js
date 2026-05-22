@@ -444,8 +444,8 @@ function advancePhase(room) {
 
         // 3秒后自动开始下一局
         setTimeout(() => {
-            // 检查是否还有玩家有足够筹码
-            const eligiblePlayers = room.players.filter(p => p.chips >= room.bigBlind);
+            handleRebuy(room);
+            const eligiblePlayers = room.players.filter(p => p.chips >= room.bigBlind && !p.isSpectator);
             if (eligiblePlayers.length >= 2) {
                 startNewHand(room);
                 // 发送 gameStarted 事件，确保所有必要字段都包含
@@ -839,7 +839,8 @@ io.on('connection', (socket) => {
 
             // 3秒后自动开始下一局
             setTimeout(() => {
-                const eligiblePlayers = room.players.filter(p => p.chips >= room.bigBlind);
+                handleRebuy(room);
+                const eligiblePlayers = room.players.filter(p => p.chips >= room.bigBlind && !p.isSpectator);
                 if (eligiblePlayers.length >= 2) {
                     startNewHand(room);
                     io.to(room.id).emit('gameStarted', {
