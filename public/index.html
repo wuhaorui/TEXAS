@@ -988,12 +988,13 @@
 
             const list = document.getElementById('game-players-list');
             list.innerHTML = players.map(p => `
-                <div class="player-item${p.isSpectator ? ' spectator' : ''}">
+                <div class="player-item${p.isSpectator ? ' spectator' : ''}${p.disconnected ? ' disconnected' : ''}">
                     <span class="name">
                         ${p.name}${p.rebuyCount > 0 ? ` <span style="color:#ff9800;font-size:0.8em;">(-${p.rebuyCount}手)</span>` : ''}
+                        ${p.disconnected ? '<span class="ready-badge" style="background:#f44336;">断线</span>' : ''}
                         ${p.isSpectator ? '<span class="ready-badge" style="background:#666;">观战中</span>' : ''}
                         ${p.isHost ? '<span class="host-badge">房主</span>' : ''}
-                        ${p.ready && !p.isHost && !p.isSpectator ? '<span class="ready-badge">已准备</span>' : ''}
+                        ${p.ready && !p.isHost && !p.isSpectator && !p.disconnected ? '<span class="ready-badge">已准备</span>' : ''}
                     </span>
                     <span class="chips">${p.chips.toLocaleString()}</span>
                     ${game.isHost && !p.isHost && !p.isSpectator ? `<button class="transfer-btn" onclick="transferHost('${p.id}')">转让</button>` : ''}
@@ -1221,9 +1222,12 @@
                 const isFolded = player.folded;
 
                 // 名字：如果有 rebuyCount 则追加标记
-                const displayName = player.rebuyCount > 0
+                let displayName = player.rebuyCount > 0
                     ? `${player.name}<span style="font-size:0.7em;color:#ff9800;">(-${player.rebuyCount}手)</span>`
                     : player.name;
+                if (player.disconnected) {
+                    displayName += ' <span style="color:#f44336;font-size:0.7em;">断线</span>';
+                }
 
                 let positionBadges = '';
                 if (isDealer) positionBadges += '<div class="position-badge dealer">D</div>';

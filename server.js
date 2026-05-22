@@ -210,7 +210,8 @@ function serializePlayer(p, extras) {
         isHost: p.isHost,
         ready: p.ready,
         isSpectator: p.isSpectator || false,
-        rebuyCount: p.rebuyCount || 0
+        rebuyCount: p.rebuyCount || 0,
+        disconnected: p.disconnected || false
     };
     if (extras) Object.assign(obj, extras);
     return obj;
@@ -304,7 +305,7 @@ function startNewHand(room) {
 // 进入下一阶段
 function advancePhase(room) {
     // 如果只剩一个未弃牌玩家，跳过所有阶段直接判胜（安全网）
-    const nonFolded = room.players.filter(p => !p.folded && !p.isSpectator);
+    const nonFolded = room.players.filter(p => !p.folded && !p.isSpectator && !p.disconnected);
     if (nonFolded.length === 1) {
         console.log('[advancePhase] 只剩一人未弃牌，直接判胜');
         const winner = nonFolded[0];
@@ -329,7 +330,7 @@ function advancePhase(room) {
 
         setTimeout(() => {
             handleRebuy(room);
-            const eligiblePlayers = room.players.filter(p => p.chips >= room.bigBlind && !p.isSpectator);
+            const eligiblePlayers = room.players.filter(p => p.chips >= room.bigBlind && !p.isSpectator && !p.disconnected);
             if (eligiblePlayers.length >= 2) {
                 startNewHand(room);
                 io.to(room.id).emit('gameStarted', {
@@ -385,7 +386,7 @@ function advancePhase(room) {
         setTimeout(() => {
             // 先补充 allIn 输家筹码，再检查人数
             handleRebuy(room);
-            const ep = room.players.filter(p => p.chips >= room.bigBlind && !p.isSpectator);
+            const ep = room.players.filter(p => p.chips >= room.bigBlind && !p.isSpectator && !p.disconnected);
             if (ep.length >= 2) {
                 startNewHand(room);
                 io.to(room.id).emit('gameStarted', { players: playerListEx(room, ['hand']), dealer: room.dealer, phase: room.phase, currentPlayer: room.currentPlayer, pot: room.pot, currentBet: room.currentBet, smallBlind: room.smallBlind, bigBlind: room.bigBlind });
@@ -445,7 +446,7 @@ function advancePhase(room) {
         // 3秒后自动开始下一局
         setTimeout(() => {
             handleRebuy(room);
-            const eligiblePlayers = room.players.filter(p => p.chips >= room.bigBlind && !p.isSpectator);
+            const eligiblePlayers = room.players.filter(p => p.chips >= room.bigBlind && !p.isSpectator && !p.disconnected);
             if (eligiblePlayers.length >= 2) {
                 startNewHand(room);
                 // 发送 gameStarted 事件，确保所有必要字段都包含
@@ -467,7 +468,7 @@ function advancePhase(room) {
 
     // 设置本阶段第一个行动的玩家（dealer下一位）
     room.currentPlayer = (room.dealer + 1) % room.players.length;
-    while (room.players[room.currentPlayer].folded || room.players[room.currentPlayer].allIn || room.players[room.currentPlayer].isSpectator) {
+    while (room.players[room.currentPlayer].folded || room.players[room.currentPlayer].allIn || room.players[room.currentPlayer].isSpectator || room.players[room.currentPlayer].disconnected) {
         room.currentPlayer = (room.currentPlayer + 1) % room.players.length;
     }
 
@@ -608,17 +609,24 @@ io.on('connection', (socket) => {
             return;
         }
 
-        // 查找是否有同名的老玩家
-        let player = room.players.find(p => p.name === playerName);
+        // 查找是否有同名的老玩家（包括断线的）
+        let player = room.players.find(p => p.name === playerName || (oldPlayerId && p.id === oldPlayerId));
 
         if (player) {
-            // 找到同名玩家，重新分配 socket
+            // 找到玩家，重新分配 socket 并恢复断线状态
             player.socketId = socket.id;
+            player.disconnected = false;
             socket.playerId = player.id;
             socket.roomId = roomId;
             socket.join(roomId);
 
-            console.log(`玩家重新加入: ${playerName} 房间 ${roomId}`);
+            // 清除断线计时器
+            if (player._disconnectTimer) {
+                clearTimeout(player._disconnectTimer);
+                player._disconnectTimer = null;
+            }
+
+            console.log(`玩家重新加入: ${playerName} 房间 ${roomId}${player.disconnected ? ' (断线恢复)' : ''}`);
 
             callback({
                 success: true,
@@ -814,7 +822,7 @@ io.on('connection', (socket) => {
         room.actedThisPhase.add(playerIndex);
 
         // 检查是否只剩一个未弃牌玩家（其他人全弃牌），直接判胜
-        const nonFolded = room.players.filter(p => !p.folded && !p.isSpectator);
+        const nonFolded = room.players.filter(p => !p.folded && !p.isSpectator && !p.disconnected);
         if (nonFolded.length === 1) {
             const winner = nonFolded[0];
             winner.chips += room.pot;
@@ -840,7 +848,7 @@ io.on('connection', (socket) => {
             // 3秒后自动开始下一局
             setTimeout(() => {
                 handleRebuy(room);
-                const eligiblePlayers = room.players.filter(p => p.chips >= room.bigBlind && !p.isSpectator);
+                const eligiblePlayers = room.players.filter(p => p.chips >= room.bigBlind && !p.isSpectator && !p.disconnected);
                 if (eligiblePlayers.length >= 2) {
                     startNewHand(room);
                     io.to(room.id).emit('gameStarted', {
@@ -873,7 +881,7 @@ io.on('connection', (socket) => {
         let nextPlayer = -1;
         for (let i = 1; i < room.players.length; i++) {
             const idx = (playerIndex + i) % room.players.length;
-            if (!room.players[idx].folded && !room.players[idx].allIn && !room.players[idx].isSpectator) {
+            if (!room.players[idx].folded && !room.players[idx].allIn && !room.players[idx].isSpectator && !room.players[idx].disconnected) {
                 nextPlayer = idx;
                 break;
             }
@@ -882,7 +890,7 @@ io.on('connection', (socket) => {
         // 判断一轮是否结束：
         // 1. 所有active玩家下注金额相等
         // 2. 所有active玩家都已行动过（或无法行动）
-        const activePlayers = room.players.filter(p => !p.folded && !p.allIn && !p.isSpectator);
+        const activePlayers = room.players.filter(p => !p.folded && !p.allIn && !p.isSpectator && !p.disconnected);
         const allMatched = activePlayers.length > 0 && activePlayers.every(p => p.currentBet === room.currentBet);
         const allActed = activePlayers.every(p => room.actedThisPhase.has(room.players.indexOf(p)));
 
@@ -974,38 +982,94 @@ io.on('connection', (socket) => {
         callback({ success: true });
     });
 
-    // 断开连接
+    // 断开连接（不立即删除，给移动端切后台重连留窗口期）
     socket.on('disconnect', (reason) => {
         console.log('=== DISCONNECT ===');
-        console.log('socket.id:', socket.id);
-        console.log('socket.playerId:', socket.playerId);
-        console.log('socket.roomId:', socket.roomId);
-        console.log('reason:', reason);
+        console.log('socket.id:', socket.id, 'playerId:', socket.playerId, 'roomId:', socket.roomId, 'reason:', reason);
         const room = rooms[socket.roomId];
-        if (!room) {
-            console.log('房间不存在于 disconnect');
-            return;
-        }
-        console.log('房间:', room.id, '游戏已开始:', room.gameStarted);
+        if (!room) return;
 
         const playerIndex = room.players.findIndex(p => p.id === socket.playerId);
-        if (playerIndex === -1) {
-            console.log('找不到玩家:', socket.playerId);
-            return;
-        }
+        if (playerIndex === -1) return;
 
         const player = room.players[playerIndex];
-        console.log('离开的玩家:', player.name, '(index:', playerIndex, ')');
-        io.to(room.id).emit('playerLeft', { playerId: socket.playerId, playerName: player.name });
+        console.log('玩家断线:', player.name, '(index:', playerIndex, ')');
 
-        room.players.splice(playerIndex, 1);
+        // 标记为断线（不删除），60 秒后如果还没重连才真正移除
+        player.disconnected = true;
+        player.socketId = null;
+        io.to(room.id).emit('playerLeft', { playerId: socket.playerId, playerName: player.name + ' (断线)' });
 
-        if (room.players.length === 0) {
-            delete rooms[socket.roomId];
-        } else if (player.isHost) {
-            room.players[0].isHost = true;
-            io.to(room.id).emit('newHost', { hostId: room.players[0].id });
+        // 如果是当前行动玩家，自动弃牌
+        if (room.currentPlayer === playerIndex && room.phase !== 'waiting' && room.phase !== 'showdown') {
+            console.log('[断线] 当前行动玩家断线，自动弃牌');
+            player.folded = true;
+            // 模拟 fold 后的游戏流程
+            const betActions = ['bet', 'raise', 'allin'];
+            // 计算下一个玩家
+            let nextPlayer = -1;
+            for (let i = 1; i < room.players.length; i++) {
+                const idx = (playerIndex + i) % room.players.length;
+                if (!room.players[idx].folded && !room.players[idx].allIn && !room.players[idx].isSpectator && !room.players[idx].disconnected) {
+                    nextPlayer = idx;
+                    break;
+                }
+            }
+            room.actedThisPhase.add(playerIndex);
+            // 检查是否只剩一人
+            const nonFolded = room.players.filter(p => !p.folded && !p.isSpectator && !p.disconnected);
+            if (nonFolded.length === 1) {
+                const winner = nonFolded[0];
+                winner.chips += room.pot;
+                room.pot = 0;
+                room.phase = 'showdown';
+                io.to(room.id).emit('gameEnd', {
+                    players: playerListEx(room, ['hand']),
+                    communityCards: room.communityCards, pot: 0,
+                    winners: [winner.id], handName: '对手断线弃牌',
+                    results: nonFolded.map(p => ({ playerId: p.id, handName: '对手断线弃牌', handRank: 0 })),
+                    dealer: room.dealer
+                });
+                setTimeout(() => {
+                    handleRebuy(room);
+                    const ep = room.players.filter(p => p.chips >= room.bigBlind && !p.isSpectator && !p.disconnected);
+                    if (ep.length >= 2) {
+                        startNewHand(room);
+                        io.to(room.id).emit('gameStarted', { players: playerListEx(room, ['hand']), dealer: room.dealer, phase: room.phase, currentPlayer: room.currentPlayer, pot: room.pot, currentBet: room.currentBet, smallBlind: room.smallBlind, bigBlind: room.bigBlind });
+                    }
+                }, 3000);
+            } else if (nextPlayer === -1) {
+                advancePhase(room);
+            } else {
+                room.currentPlayer = nextPlayer;
+                io.to(room.id).emit('gameUpdate', {
+                    players: playerList(room),
+                    communityCards: room.communityCards, pot: room.pot,
+                    currentBet: room.currentBet, currentPlayer: room.currentPlayer,
+                    phase: room.phase, dealer: room.dealer
+                });
+            }
         }
+
+        // 60 秒后如果还没重连，真正移除
+        const disconnectTimer = setTimeout(() => {
+            const currentRoom = rooms[socket.roomId];
+            if (currentRoom) {
+                const pi = currentRoom.players.findIndex(p => p.id === socket.playerId);
+                if (pi !== -1 && currentRoom.players[pi].disconnected) {
+                    console.log('[断线超时] 移除玩家:', currentRoom.players[pi].name);
+                    currentRoom.players.splice(pi, 1);
+                    if (currentRoom.players.length === 0) {
+                        delete rooms[socket.roomId];
+                    } else if (currentRoom.players[pi] && currentRoom.players[pi].isHost) {
+                        // 原房主被移除，转让给第一个活跃玩家
+                        const newHost = currentRoom.players.find(p => !p.isSpectator && !p.disconnected) || currentRoom.players[0];
+                        if (newHost) { newHost.isHost = true; io.to(currentRoom.id).emit('newHost', { hostId: newHost.id }); }
+                    }
+                }
+            }
+        }, 60000);
+        player._disconnectTimer = disconnectTimer;
     });
 });
 
