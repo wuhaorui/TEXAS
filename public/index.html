@@ -589,6 +589,15 @@
                 </div>
             </div>
 
+            <!-- 自定义对话框：游戏结束 -->
+            <div class="modal-overlay" id="game-end-modal" style="display:none;">
+                <div class="modal-box">
+                    <div class="modal-title" id="game-end-title">🃏 游戏结束！</div>
+                    <div class="modal-message" id="game-end-message"></div>
+                    <button class="modal-btn" onclick="closeGameEndModal()">确定</button>
+                </div>
+            </div>
+
             <!-- 自定义对话框：新对局开始 -->
             <div class="modal-overlay" id="new-hand-modal" style="display:none;">
                 <div class="modal-box">
@@ -1068,6 +1077,8 @@
 
         socket.on('gameStarted', (data) => {
             console.log('游戏开始!', data);
+            // 关闭上一局的结束弹窗
+            document.getElementById('game-end-modal').style.display = 'none';
             document.getElementById('waiting-section').style.display = 'none';
             document.getElementById('playing-area').style.display = 'block';
 
@@ -1123,29 +1134,35 @@
         socket.on('gameEnd', (data) => {
             console.log('游戏结束:', data);
 
-            // 显示所有玩家的手牌和牌型
-            let message = `🃏 游戏结束！\n\n`;
-
-            if (data.handName === '对手弃牌') {
-                const winner = data.players.find(p => !p.folded);
-                message += `🏆 ${winner.name} 获胜！（对手弃牌）\n`;
-                message += `💰 赢得 ${data.pot.toLocaleString()} 筹码\n`;
-            } else {
-                data.results.forEach(r => {
-                    const player = data.players.find(p => p.id === r.playerId);
-                    const isWinner = data.winners.includes(r.playerId);
-                    message += `${isWinner ? '🏆' : '  '} ${player.name}: ${r.handName}\n`;
-                });
-                message += `\n💰 奖池: ${data.pot.toLocaleString()} 筹码\n`;
-            }
-
-            // 更新游戏状态（包括 dealer 位置，用于显示 SB/BB/D 标识）
+            // 更新游戏状态 — 先渲染公共牌和所有手牌
             game.dealer = data.dealer !== undefined ? data.dealer : game.dealer;
             game.players = data.players;
             updateGameState(data);
 
-            alert(message);
+            // 构建结果消息
+            let message = '';
+            if (data.handName === '对手全弃牌' || data.handName === '对手弃牌') {
+                const winner = data.players.find(p => p.id === data.winners[0]);
+                message = `🏆 <b>${winner ? winner.name : '未知'}</b> 获胜！<br>（所有对手弃牌）<br>💰 赢取 ${data.pot.toLocaleString()} 筹码`;
+            } else {
+                message = '<div style="text-align:left;line-height:1.8;">';
+                data.results.forEach(r => {
+                    const player = data.players.find(p => p.id === r.playerId);
+                    const isWinner = data.winners.includes(r.playerId);
+                    message += `${isWinner ? '🏆' : '&nbsp;&nbsp;'} <b>${player.name}</b>: ${r.handName}<br>`;
+                });
+                message += `</div><div style="margin-top:8px;">💰 奖池: ${data.pot.toLocaleString()} 筹码</div>`;
+            }
+
+            // 用非阻塞模态框显示结果（让 DOM 先渲染社区牌）
+            document.getElementById('game-end-message').innerHTML = message;
+            document.getElementById('game-end-modal').style.display = 'flex';
         });
+
+        // 关闭游戏结束对话框
+        function closeGameEndModal() {
+            document.getElementById('game-end-modal').style.display = 'none';
+        }
 
         function updateGameState(data) {
             // 保留自己的手牌（服务器发送的 gameUpdate 中没有 hand 字段）
