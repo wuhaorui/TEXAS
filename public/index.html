@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>德州扑克 - 多人在线</title>
+    <title>DA男篮自用德州扑克</title>
     <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=Noto+Sans+SC:wght@400;500;700&display=swap" rel="stylesheet">
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -184,6 +184,7 @@
             border-radius: 12px;
             border: 2px solid rgba(255, 255, 255, 0.15);
             min-width: 110px;
+            flex-shrink: 0;
             position: relative;
             transition: all 0.3s;
         }
@@ -528,11 +529,25 @@
 
         @media (max-width: 768px) {
             .logo { font-size: 2rem; }
-            .seat { min-width: 90px; padding: 8px 12px; }
-            .card { width: 45px; height: 65px; }
-            .hand-cards .card { width: 55px; height: 80px; }
+            .seat { min-width: 80px; padding: 6px 8px; flex-shrink: 0; }
+            .card { width: 40px; height: 58px; }
+            .hand-cards .card { width: 50px; height: 72px; }
+            .seat-cards .card { width: 28px; height: 40px; }
+            .seat-cards .card-corner { font-size: 0.45rem; }
+            .seat-cards .card-corner.top { top: 1px; left: 2px; }
+            .seat-cards .card-corner.bottom { bottom: 1px; right: 2px; }
+            .seat-cards .card-center { font-size: 0.7rem; }
+            .seat-cards .card-suit { font-size: 0.45rem; }
+            .community-cards .card { width: 45px; height: 65px; }
+            .community-cards .card-corner { font-size: 0.6rem; }
+            .community-cards .card-center { font-size: 1.1rem; }
+            .community-cards .card-suit { font-size: 0.7rem; }
             .action-btn { padding: 12px 16px; min-width: 65px; font-size: 0.9rem; }
-            .players-top { gap: 10px; flex-wrap: wrap; }
+            .seats-row { gap: 6px; overflow-x: auto; justify-content: flex-start; -webkit-overflow-scrolling: touch; }
+            .seat-name { font-size: 0.75rem; }
+            .seat-chips { font-size: 0.75rem; }
+            .seat-cards { gap: 2px; }
+            .position-badge { width: 20px; height: 20px; font-size: 0.55rem; top: -8px; left: -8px; }
         }
     </style>
 </head>
@@ -541,7 +556,7 @@
     <div id="lobby-screen" class="screen active">
         <div class="lobby-container">
             <h1 class="logo">TEXAS HOLD'EM</h1>
-            <p class="subtitle">多人在线德州扑克</p>
+            <p class="subtitle">DA男篮自用德州扑克</p>
 
             <div class="menu-card">
                 <h2 class="menu-title">创建房间</h2>
@@ -567,7 +582,7 @@
     <div id="game-screen" class="screen">
         <div class="game-container">
             <div class="table-header">
-                <div class="table-info">♠♥ 德州扑克 ♦♣</div>
+                <div class="table-info">♠♥ DA男篮自用德州扑克 ♦♣</div>
                 <div class="player-balance">
                     <span class="balance-label">剩余:</span>
                     <span class="balance-amount" id="player-balance">0</span>
@@ -858,18 +873,36 @@
                     game.playerName = playerName;
                     game.roomId = roomId;
                     game.isHost = false;
+                    game.isSpectator = response.isSpectator || false;
 
                     // 保存房间信息到本地
                     saveRoomInfo(roomId, playerName, response.playerId);
 
                     document.getElementById('lobby-screen').classList.remove('active');
                     document.getElementById('game-screen').classList.add('active');
-                    document.getElementById('waiting-section').style.display = 'block';
-                    document.getElementById('playing-area').style.display = 'none';
-                    document.getElementById('room-info-box').style.display = 'none'; // 加入者看不到房间设置
 
-                    updatePlayersList(response.players);
-                    updateReadyButton(false);
+                    if (response.isSpectator) {
+                        // 观战者：直接进入游戏画面
+                        document.getElementById('waiting-section').style.display = 'none';
+                        document.getElementById('playing-area').style.display = 'block';
+                        document.getElementById('room-info-box').style.display = 'none';
+                        document.getElementById('action-area').style.display = 'none';
+                        // 用 gameState 数据初始化游戏画面
+                        if (response.gameState) {
+                            game.players = response.players;
+                            game.phase = response.gameState.phase;
+                            game.currentPlayer = response.gameState.currentPlayer;
+                            game.dealer = response.gameState.dealer;
+                            updateGameState({ ...response.gameState, players: response.players });
+                        }
+                        alert('你以观战者身份加入，下一局将自动参与游戏');
+                    } else {
+                        document.getElementById('waiting-section').style.display = 'block';
+                        document.getElementById('playing-area').style.display = 'none';
+                        document.getElementById('room-info-box').style.display = 'none';
+                        updatePlayersList(response.players);
+                        updateReadyButton(false);
+                    }
                 } else {
                     alert(response.error || '加入房间失败');
                 }
@@ -946,14 +979,15 @@
 
             const list = document.getElementById('game-players-list');
             list.innerHTML = players.map(p => `
-                <div class="player-item">
+                <div class="player-item${p.isSpectator ? ' spectator' : ''}">
                     <span class="name">
-                        ${p.name}
+                        ${p.name}${p.rebuyCount > 0 ? ` <span style="color:#ff9800;font-size:0.8em;">(-${p.rebuyCount}手)</span>` : ''}
+                        ${p.isSpectator ? '<span class="ready-badge" style="background:#666;">观战中</span>' : ''}
                         ${p.isHost ? '<span class="host-badge">房主</span>' : ''}
-                        ${p.ready && !p.isHost ? '<span class="ready-badge">已准备</span>' : ''}
+                        ${p.ready && !p.isHost && !p.isSpectator ? '<span class="ready-badge">已准备</span>' : ''}
                     </span>
-                    <span class="chips">${p.chips}</span>
-                    ${game.isHost && !p.isHost ? `<button class="transfer-btn" onclick="transferHost('${p.id}')">转让</button>` : ''}
+                    <span class="chips">${p.chips.toLocaleString()}</span>
+                    ${game.isHost && !p.isHost && !p.isSpectator ? `<button class="transfer-btn" onclick="transferHost('${p.id}')">转让</button>` : ''}
                 </div>
             `).join('');
 
@@ -1037,9 +1071,16 @@
             document.getElementById('waiting-section').style.display = 'none';
             document.getElementById('playing-area').style.display = 'block';
 
-            // 保存自己的手牌
+            // 保存自己的手牌，更新观战者状态
             const me = data.players.find(p => p.id === game.playerId);
             game.myHand = me && me.hand ? [...me.hand] : [];
+            game.isSpectator = me ? (me.isSpectator || false) : false;
+
+            // 观战者不显示新局弹窗
+            if (game.isSpectator) {
+                updateGameState(data);
+                return;
+            }
 
             // 清空公共牌显示
             const communityCards = document.querySelectorAll('#community-cards .card');
@@ -1152,12 +1193,20 @@
 
             // 渲染座位
             function renderSeat(player, index, posType) {
+                // 跳过观战者，不渲染座位
+                if (player.isSpectator) return '';
+
                 const isMe = player.id === game.playerId;
                 const isActive = index === data.currentPlayer && game.phase !== 'waiting' && game.phase !== 'showdown';
                 const isDealer = index === dealerIdx;
                 const isSB = index === sbIdx;
                 const isBB = index === bbIdx;
                 const isFolded = player.folded;
+
+                // 名字：如果有 rebuyCount 则追加标记
+                const displayName = player.rebuyCount > 0
+                    ? `${player.name}<span style="font-size:0.7em;color:#ff9800;">(-${player.rebuyCount}手)</span>`
+                    : player.name;
 
                 let positionBadges = '';
                 if (isDealer) positionBadges += '<div class="position-badge dealer">D</div>';
@@ -1189,7 +1238,7 @@
                 return `
                     <div class="${seatClass}" data-index="${index}">
                         ${positionBadges}
-                        <div class="seat-name">${player.name}${isMe ? ' (你)' : ''}</div>
+                        <div class="seat-name">${displayName}${isMe ? ' (你)' : ''}</div>
                         <div class="seat-cards">${cardsHtml}</div>
                         <div class="seat-chips">${player.chips.toLocaleString()}</div>
                     </div>
@@ -1291,7 +1340,7 @@
             raiseBtn.style.display = 'none';
             actionsDiv.style.display = 'none';
 
-            if (!isMyTurn || player.folded || player.allIn || game.phase === 'waiting') {
+            if (!isMyTurn || player.folded || player.allIn || game.phase === 'waiting' || game.isSpectator || player.isSpectator) {
                 return;
             }
 
