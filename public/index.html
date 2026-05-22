@@ -598,6 +598,7 @@
 
                 <div class="action-buttons">
                     <button type="button" class="btn btn-secondary ready-btn" id="ready-btn" onclick="toggleReady()">准备</button>
+                    <button type="button" class="btn btn-secondary" onclick="showRenameInput()">改名</button>
                     <button type="button" class="btn btn-primary start-btn" id="start-btn" onclick="startGame()" style="display: none;">开始游戏</button>
                 </div>
             </div>
@@ -763,16 +764,16 @@
         }
 
         // 检查是否可以重新加入
-        // 如果有 URL room 参数，优先用 URL room，忽略 localStorage 旧房间
+        // 如果有 URL room 参数：预填房间号，但不自动加入，让玩家先取名
         setTimeout(() => {
             if (!game.roomId) {
                 if (roomFromUrl) {
-                    // 有 URL 房间号：不弹 checkRejoin 的 localStorage 旧房间确认框
-                    const savedPlayerName = localStorage.getItem('texas_playerName') || '';
+                    // 有 URL 房间号：仅预填昵称，不自动加入，等玩家手动点"加入"
+                    const savedPlayerName = localStorage.getItem('texas_playerName');
                     if (savedPlayerName) {
                         document.getElementById('join-player-name').value = savedPlayerName;
                     }
-                    rejoinRoom(roomFromUrl, savedPlayerName || '玩家' + Math.floor(Math.random() * 1000), localStorage.getItem('texas_playerId'));
+                    // 不调用 rejoinRoom，让玩家手动输入昵称后点"加入"
                 } else {
                     checkRejoin();
                 }
@@ -983,6 +984,24 @@
             });
         }
 
+        // ============ 改名功能 ============
+        function showRenameInput() {
+            const newName = prompt('请输入新昵称（最多12字）：', game.playerName || '');
+            if (!newName || !newName.trim()) return;
+            const trimmed = newName.trim().substring(0, 12);
+
+            socket.emit('renamePlayer', { newName: trimmed }, (response) => {
+                if (response.success) {
+                    game.playerName = trimmed;
+                    localStorage.setItem('texas_playerName', trimmed);
+                    // updatePlayersList 会在 playerRenamed 事件中自动触发
+                    alert(`昵称已改为: ${trimmed}`);
+                } else {
+                    alert(response.error || '改名失败');
+                }
+            });
+        }
+
         // ============ Socket 事件 ============
         socket.on('playerJoined', (data) => {
             updatePlayersList(data.players);
@@ -994,6 +1013,10 @@
             updatePlayersList(data.players);
             const myPlayer = data.players.find(p => p.id === game.playerId);
             if (myPlayer) updateReadyButton(myPlayer.ready);
+        });
+
+        socket.on('playerRenamed', (data) => {
+            updatePlayersList(data.players);
         });
 
         socket.on('newHost', (data) => {

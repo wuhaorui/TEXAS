@@ -942,6 +942,43 @@ io.on('connection', (socket) => {
         callback({ success: true });
     });
 
+    // 改名
+    socket.on('renamePlayer', (data, callback) => {
+        const room = rooms[socket.roomId];
+        if (!room) {
+            callback({ success: false, error: '房间不存在' });
+            return;
+        }
+
+        const player = room.players.find(p => p.id === socket.playerId);
+        if (!player) {
+            callback({ success: false, error: '玩家不存在' });
+            return;
+        }
+
+        const { newName } = data;
+        if (!newName || !newName.trim()) {
+            callback({ success: false, error: '昵称不能为空' });
+            return;
+        }
+
+        const trimmed = newName.trim().substring(0, 12);
+        player.name = trimmed;
+
+        // 广播更新后的玩家列表
+        io.to(room.id).emit('playerRenamed', {
+            players: room.players.map(p => ({
+                id: p.id,
+                name: p.name,
+                chips: p.chips,
+                isHost: p.isHost,
+                ready: p.ready
+            }))
+        });
+
+        callback({ success: true });
+    });
+
     // 断开连接
     socket.on('disconnect', (reason) => {
         console.log('=== DISCONNECT ===');
