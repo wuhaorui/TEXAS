@@ -328,7 +328,8 @@ function advancePhase(room) {
         });
 
         setTimeout(() => {
-            const eligiblePlayers = room.players.filter(p => p.chips >= room.bigBlind);
+            handleRebuy(room);
+            const eligiblePlayers = room.players.filter(p => p.chips >= room.bigBlind && !p.isSpectator);
             if (eligiblePlayers.length >= 2) {
                 startNewHand(room);
                 io.to(room.id).emit('gameStarted', {
@@ -380,9 +381,11 @@ function advancePhase(room) {
             });
         }, 1500);
 
-        // 第三步：3.5 秒后开始新一局（比正常多 0.5s 给翻牌缓冲）
+        // 第三步：3.5 秒后开始新一局
         setTimeout(() => {
-            const ep = room.players.filter(p => p.chips >= room.bigBlind);
+            // 先补充 allIn 输家筹码，再检查人数
+            handleRebuy(room);
+            const ep = room.players.filter(p => p.chips >= room.bigBlind && !p.isSpectator);
             if (ep.length >= 2) {
                 startNewHand(room);
                 io.to(room.id).emit('gameStarted', { players: playerListEx(room, ['hand']), dealer: room.dealer, phase: room.phase, currentPlayer: room.currentPlayer, pot: room.pot, currentBet: room.currentBet, smallBlind: room.smallBlind, bigBlind: room.bigBlind });
