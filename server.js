@@ -304,7 +304,7 @@ function startNewHand(room) {
 // 进入下一阶段
 function advancePhase(room) {
     // 如果只剩一个未弃牌玩家，跳过所有阶段直接判胜（安全网）
-    const nonFolded = room.players.filter(p => !p.folded);
+    const nonFolded = room.players.filter(p => !p.folded && !p.isSpectator);
     if (nonFolded.length === 1) {
         console.log('[advancePhase] 只剩一人未弃牌，直接判胜');
         const winner = nonFolded[0];
@@ -354,25 +354,40 @@ function advancePhase(room) {
         else if (room.phase === 'turn') room.communityCards.push(room.deck.pop());
         room.phase = 'showdown';
 
-        const { winners, handName, results } = getWinners(room.players, room.communityCards);
-        const winAmount = Math.floor(room.pot / winners.length);
-        winners.forEach(w => { const p = room.players.find(pp => pp.id === w.id); if (p) p.chips += winAmount; });
-
-        io.to(room.id).emit('gameEnd', {
-            players: playerListEx(room, ['hand']),
-            communityCards: room.communityCards, pot: room.pot,
-            winners: winners.map(w => w.id), handName,
-            results: results.map(r => ({ playerId: r.player.id, handName: r.handName, handRank: r.handRank })),
+        // 第一步：先发 gameUpdate 亮出所有公共牌
+        io.to(room.id).emit('gameUpdate', {
+            players: playerList(room),
+            communityCards: room.communityCards,
+            pot: room.pot,
+            currentBet: room.currentBet,
+            currentPlayer: room.currentPlayer,
+            phase: room.phase,
             dealer: room.dealer
         });
 
+        // 第二步：延迟 1.5 秒后发 gameEnd 显示结果
+        setTimeout(() => {
+            const { winners, handName, results } = getWinners(room.players, room.communityCards);
+            const winAmount = Math.floor(room.pot / winners.length);
+            winners.forEach(w => { const p = room.players.find(pp => pp.id === w.id); if (p) p.chips += winAmount; });
+
+            io.to(room.id).emit('gameEnd', {
+                players: playerListEx(room, ['hand']),
+                communityCards: room.communityCards, pot: room.pot,
+                winners: winners.map(w => w.id), handName,
+                results: results.map(r => ({ playerId: r.player.id, handName: r.handName, handRank: r.handRank })),
+                dealer: room.dealer
+            });
+        }, 1500);
+
+        // 第三步：3.5 秒后开始新一局（比正常多 0.5s 给翻牌缓冲）
         setTimeout(() => {
             const ep = room.players.filter(p => p.chips >= room.bigBlind);
             if (ep.length >= 2) {
                 startNewHand(room);
                 io.to(room.id).emit('gameStarted', { players: playerListEx(room, ['hand']), dealer: room.dealer, phase: room.phase, currentPlayer: room.currentPlayer, pot: room.pot, currentBet: room.currentBet, smallBlind: room.smallBlind, bigBlind: room.bigBlind });
             }
-        }, 3000);
+        }, 3500);
         return;
     }
 
@@ -449,7 +464,7 @@ function advancePhase(room) {
 
     // 设置本阶段第一个行动的玩家（dealer下一位）
     room.currentPlayer = (room.dealer + 1) % room.players.length;
-    while (room.players[room.currentPlayer].folded || room.players[room.currentPlayer].allIn) {
+    while (room.players[room.currentPlayer].folded || room.players[room.currentPlayer].allIn || room.players[room.currentPlayer].isSpectator) {
         room.currentPlayer = (room.currentPlayer + 1) % room.players.length;
     }
 
@@ -796,7 +811,7 @@ io.on('connection', (socket) => {
         room.actedThisPhase.add(playerIndex);
 
         // 检查是否只剩一个未弃牌玩家（其他人全弃牌），直接判胜
-        const nonFolded = room.players.filter(p => !p.folded);
+        const nonFolded = room.players.filter(p => !p.folded && !p.isSpectator);
         if (nonFolded.length === 1) {
             const winner = nonFolded[0];
             winner.chips += room.pot;
@@ -854,7 +869,7 @@ io.on('connection', (socket) => {
         let nextPlayer = -1;
         for (let i = 1; i < room.players.length; i++) {
             const idx = (playerIndex + i) % room.players.length;
-            if (!room.players[idx].folded && !room.players[idx].allIn) {
+            if (!room.players[idx].folded && !room.players[idx].allIn && !room.players[idx].isSpectator) {
                 nextPlayer = idx;
                 break;
             }
@@ -863,7 +878,7 @@ io.on('connection', (socket) => {
         // 判断一轮是否结束：
         // 1. 所有active玩家下注金额相等
         // 2. 所有active玩家都已行动过（或无法行动）
-        const activePlayers = room.players.filter(p => !p.folded && !p.allIn);
+        const activePlayers = room.players.filter(p => !p.folded && !p.allIn && !p.isSpectator);
         const allMatched = activePlayers.length > 0 && activePlayers.every(p => p.currentBet === room.currentBet);
         const allActed = activePlayers.every(p => room.actedThisPhase.has(room.players.indexOf(p)));
 
