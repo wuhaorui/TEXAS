@@ -999,6 +999,23 @@ io.on('connection', (socket) => {
         callback({ success: true });
     });
 
+    // 聊天消息
+    socket.on('chatMessage', (data, callback) => {
+        const room = rooms[socket.roomId];
+        if (!room) return;
+        const player = room.players.find(p => p.id === socket.playerId);
+        if (!player) return;
+        const text = (data.text || '').trim().substring(0, 100);
+        if (!text) return;
+
+        io.to(room.id).emit('chatMessage', {
+            name: player.name,
+            text
+        });
+        // callback 兼容
+        if (typeof callback === 'function') callback({ success: true });
+    });
+
     // 断开连接（不立即删除，给移动端切后台重连留窗口期）
     socket.on('disconnect', (reason) => {
         console.log('=== DISCONNECT ===');
