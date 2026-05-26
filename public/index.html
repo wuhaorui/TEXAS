@@ -1358,8 +1358,8 @@
 
                 let cardsHtml = '';
                 if (player.hand && player.hand.length > 0) {
-                    // 手牌只显示给自己的，其他人显示背面
-                    if (isMe || game.phase === 'showdown') {
+                    // 摊牌时显示所有未弃牌玩家的手牌，自己始终可见
+                    if (isMe || (game.phase === 'showdown' && !player.folded)) {
                         cardsHtml = player.hand.map(c => `
                             <div class="card ${c.suit === '♥' || c.suit === '♦' ? 'red' : 'black'}">
                                 <div class="card-corner top">${c.rank}<br><span class="card-suit">${c.suit}</span></div>

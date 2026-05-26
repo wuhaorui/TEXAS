@@ -218,7 +218,7 @@ function serializePlayer(p, extras) {
 }
 
 function playerList(room) { return room.players.map(p => serializePlayer(p)); }
-function playerListEx(room, fields) { return room.players.map(p => serializePlayer(p, fields.reduce((a, f) => { if (p[f] !== undefined) a[f] = p[f]; return a; }, {}))); }
+function playerListEx(room, fields) { return room.players.map(p => serializePlayer(p, fields.reduce((a, f) => { if (p[f] !== undefined && !(f === 'hand' && p.folded)) a[f] = p[f]; return a; }, {}))); }
 
 // allIn 输掉的玩家自动 rebuy（借2000筹码，名字后加借次数标记）
 function handleRebuy(room) {
