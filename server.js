@@ -367,7 +367,7 @@ function advancePhase(room) {
             dealer: room.dealer
         });
 
-        // 第二步：延迟 1.5 秒后发 gameEnd 显示结果
+        // 第二步：延迟 5 秒后发 gameEnd 显示结果
         setTimeout(() => {
             const { winners, handName, results } = getWinners(room.players, room.communityCards);
             const winAmount = Math.floor(room.pot / winners.length);
@@ -380,9 +380,9 @@ function advancePhase(room) {
                 results: results.map(r => ({ playerId: r.player.id, handName: r.handName, handRank: r.handRank })),
                 dealer: room.dealer
             });
-        }, 1500);
+        }, 5000);
 
-        // 第三步：3.5 秒后开始新一局
+        // 第三步：8 秒后开始新一局
         setTimeout(() => {
             // 先补充 allIn 输家筹码，再检查人数
             handleRebuy(room);
@@ -391,7 +391,7 @@ function advancePhase(room) {
                 startNewHand(room);
                 io.to(room.id).emit('gameStarted', { players: playerListEx(room, ['hand']), dealer: room.dealer, phase: room.phase, currentPlayer: room.currentPlayer, pot: room.pot, currentBet: room.currentBet, smallBlind: room.smallBlind, bigBlind: room.bigBlind });
             }
-        }, 3500);
+        }, 8000);
         return;
     }
 
@@ -439,7 +439,7 @@ function advancePhase(room) {
             dealer: room.dealer
         });
 
-        // 1.5 秒后宣布结果（同时亮出所有未弃牌玩家手牌）
+        // 5 秒后宣布结果（同时亮出所有未弃牌玩家手牌）
         setTimeout(() => {
             io.to(room.id).emit('gameEnd', {
                 players: playerListEx(room, ['hand']),
@@ -454,9 +454,9 @@ function advancePhase(room) {
                 })),
                 dealer: room.dealer
             });
-        }, 1500);
+        }, 5000);
 
-        // 4.5 秒后自动开始下一局
+        // 8 秒后自动开始下一局
         setTimeout(() => {
             handleRebuy(room);
             const eligiblePlayers = room.players.filter(p => p.chips >= room.bigBlind && !p.isSpectator && !p.disconnected);
@@ -473,7 +473,7 @@ function advancePhase(room) {
                     bigBlind: room.bigBlind
                 });
             }
-        }, 4500);
+        }, 8000);
 
         return;
     }
