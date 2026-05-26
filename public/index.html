@@ -110,7 +110,60 @@
         .btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
 
         /* 游戏界面 */
-        .game-container { width: 100%; max-width: 900px; margin: 0 auto; display: flex; flex-direction: column; min-height: 100vh; padding: 15px; }
+        .game-container { width: 100%; max-width: 960px; margin: 0 auto; display: flex; flex-direction: column; min-height: 100vh; padding: 15px; }
+
+        .game-layout { display: flex; gap: 12px; align-items: flex-start; }
+        .game-main { flex: 1; min-width: 0; }
+
+        /* 行动日志 */
+        .action-log {
+            width: 180px; flex-shrink: 0;
+            background: rgba(0, 0, 0, 0.5);
+            border: 1px solid rgba(212, 175, 55, 0.3);
+            border-radius: 12px;
+            padding: 12px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .action-log-title {
+            text-align: center;
+            font-family: 'Cinzel', serif;
+            font-size: 0.85rem;
+            color: var(--gold-accent);
+            margin-bottom: 8px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid rgba(212, 175, 55, 0.2);
+        }
+        .action-log-list {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+        .action-log-empty {
+            text-align: center;
+            color: rgba(255,255,255,0.3);
+            font-size: 0.8rem;
+            padding: 20px 0;
+        }
+        .action-log-entry {
+            padding: 5px 8px;
+            border-radius: 6px;
+            font-size: 0.75rem;
+            color: rgba(255,255,255,0.85);
+            background: rgba(255,255,255,0.06);
+            line-height: 1.3;
+            animation: logEntryIn 0.3s ease-out;
+        }
+        @keyframes logEntryIn {
+            from { opacity: 0; transform: translateX(8px); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+        .action-log-entry .log-name { color: var(--gold-accent); font-weight: 600; }
+        .action-log-entry .log-action { color: rgba(255,255,255,0.7); }
+        .action-log-entry .log-amount { color: #4fc3f7; font-weight: 600; }
+        .action-log-entry.fold-entry { background: rgba(244,67,54,0.15); }
+        .action-log-entry.fold-entry .log-action { color: #f44336; }
+        .action-log-entry.raise-entry { border-left: 2px solid var(--gold-accent); }
 
         .table-header {
             display: flex;
@@ -548,6 +601,8 @@
             .seat-chips { font-size: 0.75rem; }
             .seat-cards { gap: 2px; }
             .position-badge { width: 20px; height: 20px; font-size: 0.55rem; top: -8px; left: -8px; }
+            .game-layout { flex-direction: column; }
+            .action-log { width: 100%; max-height: 180px; }
         }
     </style>
 </head>
@@ -629,9 +684,11 @@
 
             <!-- 游戏区域 -->
             <div id="playing-area" style="display: none;">
-                <div class="game-status" id="game-status">等待开始...</div>
+                <div class="game-layout">
+                    <div class="game-main">
+                        <div class="game-status" id="game-status">等待开始...</div>
 
-                <div class="game-table">
+                        <div class="game-table">
                     <div class="table-layout">
                         <!-- 上方玩家 -->
                         <div class="seats-row top" id="seats-top"></div>
@@ -684,7 +741,21 @@
                         <button class="action-btn all-in" onclick="playerAction('allin')">全下</button>
                     </div>
                 </div>
+                <!-- /player-hand-area -->
+                    </div>
+                    <!-- /game-main -->
+
+                    <!-- 右侧行动日志 -->
+                <div class="action-log" id="action-log">
+                    <div class="action-log-title">行动记录</div>
+                    <div class="action-log-list" id="action-log-list">
+                        <div class="action-log-empty">等待行动...</div>
+                    </div>
+                </div>
+                </div>
+                <!-- /game-layout -->
             </div>
+            <!-- /playing-area -->
         </div>
     </div>
 
@@ -710,7 +781,8 @@
             myChips: 0,
             isHost: false,
             phase: 'waiting',
-            currentPlayer: 0
+            currentPlayer: 0,
+            actionLog: []
         };
 
         let selectedChips = 2000;
@@ -1078,8 +1150,9 @@
 
         socket.on('gameStarted', (data) => {
             console.log('游戏开始!', data);
-            // 关闭上一局的结束弹窗
+            // 关闭上一局的结束弹窗，清空行动日志
             document.getElementById('game-end-modal').style.display = 'none';
+            clearActionLog();
             document.getElementById('waiting-section').style.display = 'none';
             document.getElementById('playing-area').style.display = 'block';
 
@@ -1128,8 +1201,56 @@
             updateGameState(data);
         });
 
+        // ============ 行动日志 ============
+        const actionNames = {
+            fold: '弃牌', call: '跟注', check: '过牌',
+            bet: '下注', raise: '加注', allin: '全下'
+        };
+
+        function addActionLog(playerId, action, amount) {
+            const player = game.players.find(p => p.id === playerId);
+            const name = player ? player.name : '玩家';
+            const actName = actionNames[action] || action;
+            const amountStr = (action === 'fold' || action === 'check') ? '' : ` ${(amount || 0).toLocaleString()}`;
+
+            game.actionLog.push({ name, action, actName, amountStr });
+            updateActionLog();
+        }
+
+        function updateActionLog() {
+            const list = document.getElementById('action-log-list');
+            // 只显示最近 N 条（N = 活跃玩家数）
+            const maxLines = game.players.filter(p => !p.isSpectator).length || 1;
+            const entries = game.actionLog.slice(-maxLines);
+
+            if (entries.length === 0) {
+                list.innerHTML = '<div class="action-log-empty">等待行动...</div>';
+                return;
+            }
+
+            list.innerHTML = entries.map(e => {
+                let cls = 'action-log-entry';
+                if (e.action === 'fold') cls += ' fold-entry';
+                if (e.action === 'raise' || e.action === 'bet') cls += ' raise-entry';
+                return `<div class="${cls}">
+                    <span class="log-name">${e.name}</span>
+                    <span class="log-action">${e.actName}</span>
+                    ${e.amountStr ? `<span class="log-amount">${e.amountStr}</span>` : ''}
+                </div>`;
+            }).join('');
+
+            // 自动滚到底部
+            list.parentElement.scrollTop = list.parentElement.scrollHeight;
+        }
+
+        function clearActionLog() {
+            game.actionLog = [];
+            document.getElementById('action-log-list').innerHTML = '<div class="action-log-empty">等待行动...</div>';
+        }
+
         socket.on('playerAction', (data) => {
             console.log('玩家动作:', data);
+            addActionLog(data.playerId, data.action, data.amount);
         });
 
         socket.on('gameEnd', (data) => {
