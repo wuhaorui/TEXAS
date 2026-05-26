@@ -428,28 +428,40 @@ function advancePhase(room) {
             if (player) player.chips += winAmount;
         });
 
-        // 发送游戏结束信息（注意：此时 room.dealer 还是当前局的，下一局会+1）
-        io.to(room.id).emit('gameEnd', {
+        // 先发 gameUpdate 亮出所有公共牌和 phase=showdown
+        io.to(room.id).emit('gameUpdate', {
             players: playerListEx(room, ['hand']),
             communityCards: room.communityCards,
             pot: room.pot,
-            winners: winners.map(w => w.id),
-            handName,
-            results: results.map(r => ({
-                playerId: r.player.id,
-                handName: r.handName,
-                handRank: r.handRank
-            })),
-            dealer: room.dealer // 发送当前 dealer 位置，前端用于显示位置标识
+            currentBet: room.currentBet,
+            currentPlayer: room.currentPlayer,
+            phase: room.phase,
+            dealer: room.dealer
         });
 
-        // 3秒后自动开始下一局
+        // 1.5 秒后宣布结果（同时亮出所有未弃牌玩家手牌）
+        setTimeout(() => {
+            io.to(room.id).emit('gameEnd', {
+                players: playerListEx(room, ['hand']),
+                communityCards: room.communityCards,
+                pot: room.pot,
+                winners: winners.map(w => w.id),
+                handName,
+                results: results.map(r => ({
+                    playerId: r.player.id,
+                    handName: r.handName,
+                    handRank: r.handRank
+                })),
+                dealer: room.dealer
+            });
+        }, 1500);
+
+        // 4.5 秒后自动开始下一局
         setTimeout(() => {
             handleRebuy(room);
             const eligiblePlayers = room.players.filter(p => p.chips >= room.bigBlind && !p.isSpectator && !p.disconnected);
             if (eligiblePlayers.length >= 2) {
                 startNewHand(room);
-                // 发送 gameStarted 事件，确保所有必要字段都包含
                 io.to(room.id).emit('gameStarted', {
                     players: playerListEx(room, ['hand']),
                     dealer: room.dealer,
@@ -461,7 +473,7 @@ function advancePhase(room) {
                     bigBlind: room.bigBlind
                 });
             }
-        }, 3000);
+        }, 4500);
 
         return;
     }
@@ -784,6 +796,8 @@ io.on('connection', (socket) => {
         // 记录当前注额，用于判断是否有加注
         room.previousBet = room.currentBet;
 
+        // 计算实际发生的金额（用于行动日志显示）
+        let actualAmount = 0;
         if (action === 'fold') {
             player.folded = true;
         } else if (action === 'call') {
@@ -791,6 +805,7 @@ io.on('connection', (socket) => {
             player.chips -= toCall;
             player.currentBet = room.currentBet;
             room.pot += toCall;
+            actualAmount = toCall;
         } else if (action === 'bet' || action === 'raise') {
             const betAmount = parseInt(amount) || 0;
             if (betAmount <= 0) {
@@ -801,6 +816,7 @@ io.on('connection', (socket) => {
             player.currentBet += betAmount;
             room.pot += betAmount;
             room.currentBet = player.currentBet;
+            actualAmount = betAmount;
         } else if (action === 'allin') {
             const allInAmount = player.chips;
             player.chips = 0;
@@ -810,12 +826,13 @@ io.on('connection', (socket) => {
             if (player.currentBet > room.currentBet) {
                 room.currentBet = player.currentBet;
             }
+            actualAmount = allInAmount;
         }
 
         io.to(room.id).emit('playerAction', {
             playerId: socket.playerId,
             action,
-            amount: amount || 0
+            amount: actualAmount
         });
 
         // 记录本阶段已行动的玩家
@@ -999,6 +1016,17 @@ io.on('connection', (socket) => {
         player.disconnected = true;
         player.socketId = null;
         io.to(room.id).emit('playerLeft', { playerId: socket.playerId, playerName: player.name + ' (断线)' });
+
+        // 如果房主断线且游戏未开始，立即转让房主
+        if (player.isHost && !room.gameStarted) {
+            const nextHost = room.players.find(p => !p.isSpectator && !p.disconnected && p.id !== player.id);
+            if (nextHost) {
+                player.isHost = false;
+                nextHost.isHost = true;
+                io.to(room.id).emit('newHost', { hostId: nextHost.id });
+                console.log(`[断线] 房主 ${player.name} 断线，转让给 ${nextHost.name}`);
+            }
+        }
 
         // 如果是当前行动玩家，自动弃牌
         if (room.currentPlayer === playerIndex && room.phase !== 'waiting' && room.phase !== 'showdown') {

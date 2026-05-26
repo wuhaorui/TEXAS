@@ -1287,8 +1287,9 @@
         }
 
         function updateGameState(data) {
-            // 保留自己的手牌（服务器发送的 gameUpdate 中没有 hand 字段）
-            if (game.myHand && game.myHand.length > 0) {
+            // 摊牌阶段：服务端会发送所有玩家手牌，不覆盖
+            // 其他阶段：保留自己手牌（可能有的一些 gameUpdate 不含 hand）
+            if (data.phase !== 'showdown' && game.myHand && game.myHand.length > 0) {
                 const me = data.players.find(p => p.id === game.playerId);
                 if (me) me.hand = game.myHand;
             }
