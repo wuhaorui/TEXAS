@@ -248,6 +248,56 @@ function createDeck() {
     return deck;
 }
 
+// 跳过断线的当前行动玩家：如果当前行动玩家断线了，自动fold并前进
+function skipDisconnectedCurrent(room) {
+    const cp = room.players[room.currentPlayer];
+    if (!cp || !cp.disconnected) return;
+    if (room.phase === 'waiting' || room.phase === 'showdown') return;
+    console.log('[skipDisconnected] 当前玩家', cp.name, '已断线，自动弃牌跳过');
+    cp.folded = true;
+    room.actedThisPhase.add(room.currentPlayer);
+
+    let nextPlayer = -1;
+    for (let i = 1; i < room.players.length; i++) {
+        const idx = (room.currentPlayer + i) % room.players.length;
+        if (!room.players[idx].folded && !room.players[idx].allIn && !room.players[idx].isSpectator && !room.players[idx].disconnected) {
+            nextPlayer = idx;
+            break;
+        }
+    }
+
+    const nonFolded = room.players.filter(p => !p.folded && !p.isSpectator && !p.disconnected);
+    if (nonFolded.length === 1) {
+        const winner = nonFolded[0];
+        const wonPot = room.pot;
+        winner.chips += wonPot;
+        room.pot = 0;
+        room.phase = 'showdown';
+        io.to(room.id).emit('gameEnd', {
+            players: playerListEx(room, ['hand']),
+            communityCards: room.communityCards, pot: wonPot,
+            winners: [winner.id], handName: '对手断线弃牌',
+            results: nonFolded.map(p => ({ playerId: p.id, handName: '对手断线弃牌', handRank: 0 })),
+            dealer: room.dealer
+        });
+        setTimeout(() => {
+            handleRebuy(room);
+            const ep = room.players.filter(p => p.chips >= room.bigBlind && !p.isSpectator && !p.disconnected);
+            if (ep.length >= 2) { startNewHand(room); io.to(room.id).emit('gameStarted', { players: playerListEx(room, ['hand']), dealer: room.dealer, phase: room.phase, currentPlayer: room.currentPlayer, pot: room.pot, currentBet: room.currentBet, smallBlind: room.smallBlind, bigBlind: room.bigBlind }); }
+        }, 3000);
+    } else if (nextPlayer === -1) {
+        advancePhase(room);
+    } else {
+        room.currentPlayer = nextPlayer;
+        io.to(room.id).emit('gameUpdate', {
+            players: playerList(room),
+            communityCards: room.communityCards, pot: room.pot,
+            currentBet: room.currentBet, currentPlayer: room.currentPlayer,
+            phase: room.phase, dealer: room.dealer
+        });
+    }
+}
+
 function serializePlayer(p, extras) {
     const obj = {
         id: p.id,
@@ -530,6 +580,9 @@ function advancePhase(room) {
     while (room.players[room.currentPlayer].folded || room.players[room.currentPlayer].allIn || room.players[room.currentPlayer].isSpectator || room.players[room.currentPlayer].disconnected) {
         room.currentPlayer = (room.currentPlayer + 1) % room.players.length;
     }
+
+    // 保险：如果新 currentPlayer 此时刚断线，再检查一次
+    skipDisconnectedCurrent(room);
 
     io.to(room.id).emit('gameUpdate', {
         players: playerList(room),
@@ -854,6 +907,9 @@ io.on('connection', (socket) => {
             callback({ success: false, error: '房间不存在' });
             return;
         }
+
+        // 如果当前行动玩家断线了，自动跳过
+        skipDisconnectedCurrent(room);
 
         const playerIndex = room.players.findIndex(p => p.id === socket.playerId);
         if (playerIndex !== room.currentPlayer) {
