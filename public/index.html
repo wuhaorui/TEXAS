@@ -164,6 +164,13 @@
         .action-log-entry.fold-entry { background: rgba(244,67,54,0.15); }
         .action-log-entry.fold-entry .log-action { color: #f44336; }
         .action-log-entry.raise-entry { border-left: 2px solid var(--gold-accent); }
+        .action-log-phase {
+            text-align: center;
+            font-size: 0.7rem;
+            color: rgba(255,255,255,0.45);
+            padding: 3px 0;
+            letter-spacing: 1px;
+        }
 
         /* 聊天框 */
         .chat-box {
@@ -1322,9 +1329,10 @@
 
         function updateActionLog() {
             const list = document.getElementById('action-log-list');
-            // 只显示最近 N 条（N = 活跃玩家数）
+            // 阶段标题始终保留，行动记录行数=活跃玩家数
             const maxLines = game.players.filter(p => !p.isSpectator).length || 1;
-            const entries = game.actionLog.slice(-maxLines);
+            // 截取最近 maxLines 条行动记录，但保留所有阶段标题
+            const entries = game.actionLog.slice(-(maxLines + 4)); // 多取一些以防阶段标题太多
 
             if (entries.length === 0) {
                 list.innerHTML = '<div class="action-log-empty">等待行动...</div>';
@@ -1332,6 +1340,9 @@
             }
 
             list.innerHTML = entries.map(e => {
+                if (e.type === 'phase') {
+                    return `<div class="action-log-phase">— ${e.name} —</div>`;
+                }
                 let cls = 'action-log-entry';
                 if (e.action === 'fold') cls += ' fold-entry';
                 if (e.action === 'raise' || e.action === 'bet') cls += ' raise-entry';
@@ -1432,6 +1443,14 @@
 
             game.players = data.players;
             game.currentPlayer = data.currentPlayer;
+            // 阶段切换时在行动日志插入阶段标题
+            if (data.phase && data.phase !== game.phase) {
+                const phaseNames = { preflop: '翻牌前', flop: '翻牌圈', turn: '转牌圈', river: '河牌圈', showdown: '摊牌' };
+                const name = phaseNames[data.phase];
+                if (name) {
+                    game.actionLog.push({ type: 'phase', name });
+                }
+            }
             game.phase = data.phase;
             game.dealer = data.dealer !== undefined ? data.dealer : game.dealer;
             if (data.currentBet !== undefined) game.currentBet = data.currentBet;
