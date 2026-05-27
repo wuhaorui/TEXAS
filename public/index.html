@@ -110,9 +110,9 @@
         .btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
 
         /* 游戏界面 */
-        .game-container { width: 100%; max-width: 960px; margin: 0 auto; display: flex; flex-direction: column; min-height: 100vh; padding: 15px; }
+        .game-container { width: 100%; max-width: min(1400px, 90vw); margin: 0 auto; display: flex; flex-direction: column; min-height: 100vh; padding: clamp(10px, 1.5vw, 20px); }
 
-        .game-layout { display: flex; gap: 12px; align-items: flex-start; }
+        .game-layout { display: flex; gap: clamp(8px, 1.5vw, 20px); align-items: flex-start; }
         .game-main { flex: 1; min-width: 0; }
 
         /* 行动日志 */
@@ -247,7 +247,7 @@
             margin-bottom: 15px;
         }
 
-        .table-info { font-family: 'Cinzel', serif; font-size: 1.1rem; color: var(--gold-accent); }
+        .table-info { font-family: 'Cinzel', serif; font-size: clamp(1rem, 1.5vw, 1.8rem); color: var(--gold-accent); }
         .player-balance { display: flex; align-items: center; gap: 10px; }
         .balance-label { color: rgba(255, 255, 255, 0.7); }
         .balance-amount { font-size: 1.3rem; font-weight: 700; color: var(--text-gold); }
@@ -303,12 +303,12 @@
             display: flex;
             flex-direction: column;
             align-items: center;
-            gap: 6px;
-            padding: 10px 15px;
+            gap: clamp(4px, 0.5vw, 10px);
+            padding: clamp(8px, 1vw, 14px) clamp(10px, 1.5vw, 20px);
             background: rgba(0, 0, 0, 0.6);
             border-radius: 12px;
             border: 2px solid rgba(255, 255, 255, 0.15);
-            min-width: 110px;
+            min-width: clamp(95px, 10vw, 130px);
             flex-shrink: 0;
             position: relative;
             transition: all 0.3s;
@@ -343,8 +343,8 @@
         .position-badge.sb { background: linear-gradient(145deg, #e74c3c, #c0392b); }
         .position-badge.bb { background: linear-gradient(145deg, #3498db, #2980b9); }
 
-        .seat-name { font-weight: 600; font-size: 0.9rem; }
-        .seat-chips { font-size: 0.9rem; font-weight: 700; color: var(--text-gold); }
+        .seat-name { font-weight: 600; font-size: clamp(0.75rem, 0.9vw, 1rem); }
+        .seat-chips { font-size: clamp(0.75rem, 0.9vw, 1rem); font-weight: 700; color: var(--text-gold); }
         .seat-cards { display: flex; gap: 3px; min-height: 36px; justify-content: center; }
 
         /* 小卡片尺寸 */
@@ -361,14 +361,14 @@
 
         /* 公共牌更大 */
         .community-cards .card {
-            width: 60px;
-            height: 87px;
+            width: clamp(55px, 6vw, 80px);
+            height: clamp(80px, 9vw, 117px);
         }
-        .community-cards .card-corner { font-size: 0.8rem; }
+        .community-cards .card-corner { font-size: clamp(0.65rem, 0.8vw, 1rem); }
         .community-cards .card-corner.top { top: 4px; left: 6px; }
         .community-cards .card-corner.bottom { bottom: 4px; right: 6px; }
-        .community-cards .card-suit { font-size: 1rem; }
-        .community-cards .card-center { font-size: 1.7rem; }
+        .community-cards .card-suit { font-size: clamp(0.8rem, 1vw, 1.2rem); }
+        .community-cards .card-center { font-size: clamp(1.2rem, 1.8vw, 2.2rem); }
 
         .community-area { display: flex; flex-direction: column; align-items: center; gap: 10px; }
         .community-label { font-family: 'Cinzel', serif; font-size: 0.85rem; color: rgba(255, 255, 255, 0.6); letter-spacing: 2px; }
@@ -402,8 +402,8 @@
         .hand-cards { display: flex; gap: 12px; }
 
         .card {
-            width: 55px;
-            height: 80px;
+            width: clamp(40px, 4.5vw, 60px);
+            height: clamp(58px, 6.5vw, 87px);
             border-radius: 6px;
             position: relative;
             box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4);
@@ -427,15 +427,15 @@
 
         .card.red, .card.black { background: linear-gradient(145deg, var(--card-white), #e8e4dc); }
 
-        .card-corner { position: absolute; font-family: 'Cinzel', serif; font-weight: 700; font-size: 0.75rem; line-height: 1; }
+        .card-corner { position: absolute; font-family: 'Cinzel', serif; font-weight: 700; font-size: clamp(0.6rem, 0.7vw, 0.85rem); line-height: 1; }
         .card-corner.top { top: 4px; left: 6px; }
         .card-corner.bottom { bottom: 4px; right: 6px; transform: rotate(180deg); }
-        .card-suit { font-size: 0.9rem; }
+        .card-suit { font-size: clamp(0.7rem, 0.8vw, 1rem); }
         .card.red .card-corner { color: #c41e3a; }
         .card.black .card-corner { color: #1a1a1a; }
         .card.red .card-center { color: #c41e3a; }
         .card.black .card-center { color: #1a1a1a; }
-        .card-center { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 1.5rem; }
+        .card-center { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: clamp(1rem, 2vw, 2rem); }
         .card.hidden { visibility: hidden; }
 
         /* 操作区域 */
