@@ -611,8 +611,32 @@ io.on('connection', (socket) => {
             return;
         }
 
-        // 游戏已开始 → 以观战者身份加入
+        // 游戏已开始
         if (room.gameStarted) {
+            // 检查是否有同名断线玩家，有则直接恢复
+            const disconnectedPlayer = room.players.find(p => p.name === playerName && p.disconnected);
+            if (disconnectedPlayer) {
+                // 恢复断线玩家
+                disconnectedPlayer.socketId = socket.id;
+                disconnectedPlayer.disconnected = false;
+                socket.playerId = disconnectedPlayer.id;
+                socket.roomId = roomId;
+                socket.playerName = playerName;
+                socket.join(roomId);
+                if (disconnectedPlayer._disconnectTimer) {
+                    clearTimeout(disconnectedPlayer._disconnectTimer);
+                    disconnectedPlayer._disconnectTimer = null;
+                }
+                console.log(`断线玩家恢复: ${playerName} → 房间 ${roomId}`);
+                callback({
+                    success: true, playerId: disconnectedPlayer.id, roomId,
+                    isHost: disconnectedPlayer.isHost, players: playerList(room),
+                    gameInProgress: true
+                });
+                return;
+            }
+
+            // 检查名字冲突（活跃玩家）
             const exists = room.players.find(p => p.name === playerName && !p.isSpectator && !p.disconnected);
             if (exists) { callback({ success: false, error: '名字已被使用' }); return; }
 
@@ -1062,6 +1086,28 @@ io.on('connection', (socket) => {
         });
         // callback 兼容
         if (typeof callback === 'function') callback({ success: true });
+    });
+
+    // 请求当前游戏状态（断线重连/恢复时使用）
+    socket.on('requestGameState', () => {
+        const room = rooms[socket.roomId];
+        if (!room || !room.gameStarted) return;
+        const player = room.players.find(p => p.id === socket.playerId);
+        if (!player) return;
+        // 发送当前游戏状态给该玩家（包含手牌）
+        socket.emit('gameUpdate', {
+            players: room.players.map(p => {
+                const base = serializePlayer(p);
+                if (p.id === player.id && p.hand.length > 0) base.hand = p.hand;
+                return base;
+            }),
+            communityCards: room.communityCards,
+            pot: room.pot,
+            currentBet: room.currentBet,
+            currentPlayer: room.currentPlayer,
+            phase: room.phase,
+            dealer: room.dealer
+        });
     });
 
     // 断开连接（不立即删除，给移动端切后台重连留窗口期）

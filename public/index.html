@@ -1040,7 +1040,7 @@
                     game.playerId = response.playerId;
                     game.playerName = playerName;
                     game.roomId = roomId;
-                    game.isHost = false;
+                    game.isHost = response.isHost || false;
                     game.isSpectator = response.isSpectator || false;
 
                     // 保存房间信息到本地
@@ -1048,6 +1048,17 @@
 
                     document.getElementById('lobby-screen').classList.remove('active');
                     document.getElementById('game-screen').classList.add('active');
+
+                    // 断线恢复：直接回到游戏中
+                    if (response.gameInProgress) {
+                        document.getElementById('waiting-section').style.display = 'none';
+                        document.getElementById('playing-area').style.display = 'block';
+                        document.getElementById('action-area').style.display = 'block';
+                        game.isSpectator = false;
+                        updatePlayersList(response.players);
+                        socket.emit('requestGameState');
+                        return;
+                    }
 
                     if (response.isSpectator) {
                         // 观战者：直接进入游戏画面
