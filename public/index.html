@@ -869,6 +869,7 @@
             isHost: false,
             phase: 'waiting',
             currentPlayer: 0,
+            currentBet: 0,
             actionLog: []
         };
 
@@ -1288,10 +1289,14 @@
         // 关闭新对局对话框，并刷新下注UI
         function closeNewHandModal() {
             document.getElementById('new-hand-modal').style.display = 'none';
-            // 关闭模态框后，重新检查是否该我行动，显示下注UI
-            if (window.currentGameData) {
-                enableActions(window.currentGameData);
-            }
+            // 使用 game 对象的最新状态重新计算，避免 window.currentGameData 被旧数据污染
+            const data = {
+                currentBet: game.currentBet || 0,
+                phase: game.phase,
+                currentPlayer: game.currentPlayer,
+                players: game.players
+            };
+            enableActions(data);
         }
 
         socket.on('gameUpdate', (data) => {
@@ -1429,6 +1434,7 @@
             game.currentPlayer = data.currentPlayer;
             game.phase = data.phase;
             game.dealer = data.dealer !== undefined ? data.dealer : game.dealer;
+            if (data.currentBet !== undefined) game.currentBet = data.currentBet;
 
             console.log('[updateGameState] dealer:', data.dealer, 'dealerIdx will be:', data.dealer, 'phase:', data.phase);
 
