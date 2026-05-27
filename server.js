@@ -34,6 +34,8 @@ const HAND_RANKS = {
     '同花': 6, '葫芦': 7, '四条': 8, '同花顺': 9, '皇家同花顺': 10
 };
 
+const VALUE_NAMES = { 2: '2', 3: '3', 4: '4', 5: '5', 6: '6', 7: '7', 8: '8', 9: '9', 10: '10', 11: 'J', 12: 'Q', 13: 'K', 14: 'A' };
+
 function evaluateHand(cards) {
     // cards: [{suit, rank, value}] — 7张牌（2张手牌 + 5张公共牌）
     // 德州扑克规则：从7张牌中选出最好的5张牌组合
@@ -127,14 +129,14 @@ function evaluateHand(cards) {
         const kickers = values.filter(v => v !== parseInt(v1)).slice(0, 2);
         bestValues = [...triple, ...kickers];
     } else if (c1 === 2 && c2 === 2) {
-        handName = '两对';
-        handRank = HAND_RANKS[handName];
+        handName = '两对' + VALUE_NAMES[parseInt(v1)] + VALUE_NAMES[parseInt(v2)];
+        handRank = HAND_RANKS['两对'];
         tieBreaker = parseInt(v1); // v1 是高对（排序时值大的在前）
         const kick = values.find(v => v !== parseInt(v1) && v !== parseInt(v2));
         bestValues = [parseInt(v1), parseInt(v1), parseInt(v2), parseInt(v2), kick || 0];
     } else if (c1 === 2) {
-        handName = '一对';
-        handRank = HAND_RANKS[handName];
+        handName = '一对' + VALUE_NAMES[parseInt(v1)];
+        handRank = HAND_RANKS['一对'];
         tieBreaker = parseInt(v1);
         const pair = cards.filter(c => c.value === parseInt(v1)).map(c => c.value);
         const kickers = values.filter(v => v !== parseInt(v1)).slice(0, 3);
@@ -171,18 +173,65 @@ function getWinners(players, communityCards) {
         return 0;
     });
 
-    const winners = [results[0].player];
-    for (let i = 1; i < results.length; i++) {
-        if (results[i].handRank === results[0].handRank &&
-            results[i].tieBreaker === results[0].tieBreaker &&
-            JSON.stringify(results[i].values) === JSON.stringify(results[0].values)) {
-            winners.push(results[i].player);
+    // --- 边池分配 ---
+    // 按 totalPotBet 排序，从小到大处理各个贡献层级
+    const byContrib = [...results].sort((a, b) =>
+        (a.player.totalPotBet || 0) - (b.player.totalPotBet || 0)
+    );
+
+    const winners = [];
+    let prevLevel = 0;
+
+    for (const entry of byContrib) {
+        const level = entry.player.totalPotBet || 0;
+        if (level <= prevLevel) continue;
+        const increment = level - prevLevel;
+
+        // 找出参与此层级的所有玩家（totalPotBet >= level）
+        const eligible = results.filter(r => (r.player.totalPotBet || 0) >= level);
+        if (eligible.length === 0) continue;
+
+        // 此层级子池大小 = increment * 参与人数
+        // 在 eligible 中按牌力排序选出最佳
+        const best = eligible[0]; // 已按牌力排序
+        // 找出所有并列最佳的
+        const tied = eligible.filter(r =>
+            r.handRank === best.handRank &&
+            r.tieBreaker === best.tieBreaker &&
+            JSON.stringify(r.values) === JSON.stringify(best.values)
+        );
+
+        const share = Math.floor(increment * eligible.length / tied.length);
+        tied.forEach(r => {
+            if (!winners.includes(r.player)) winners.push(r.player);
+            r.player._sideWin = (r.player._sideWin || 0) + share;
+        });
+
+        prevLevel = level;
+    }
+
+    // 应用边池分配
+    winners.forEach(p => {
+        const win = p._sideWin || 0;
+        p.chips += win;
+        delete p._sideWin;
+    });
+
+    // 检查是否有 tied for first overall
+    const allWinners = [];
+    for (let i = 0; i < results.length; i++) {
+        if (i === 0) {
+            allWinners.push(results[i].player);
+        } else if (results[i].handRank === results[0].handRank &&
+                   results[i].tieBreaker === results[0].tieBreaker &&
+                   JSON.stringify(results[i].values) === JSON.stringify(results[0].values)) {
+            allWinners.push(results[i].player);
         } else {
             break;
         }
     }
 
-    return { winners, handName: results[0].handName, results };
+    return { winners: allWinners, handName: results[0].handName, results };
 }
 
 function createDeck() {
@@ -275,6 +324,7 @@ function startNewHand(room) {
     room.players.forEach(p => {
         p.hand = [];
         p.currentBet = 0;
+        p.totalPotBet = 0;
         p.folded = false;
         p.allIn = false;
         p.ready = false;
@@ -309,13 +359,14 @@ function advancePhase(room) {
     if (nonFolded.length === 1) {
         console.log('[advancePhase] 只剩一人未弃牌，直接判胜');
         const winner = nonFolded[0];
-        winner.chips += room.pot;
+        const wonPot = room.pot;
+        winner.chips += wonPot;
         room.pot = 0;
         room.phase = 'showdown';
         io.to(room.id).emit('gameEnd', {
             players: playerListEx(room, ['hand']),
             communityCards: room.communityCards,
-            pot: 0,
+            pot: wonPot,
             winners: [winner.id],
             handName: '对手全弃牌',
             results: room.players
@@ -369,13 +420,13 @@ function advancePhase(room) {
 
         // 第二步：延迟 5 秒后发 gameEnd 显示结果
         setTimeout(() => {
+            const wonPot = room.pot;
+            room.pot = 0;
             const { winners, handName, results } = getWinners(room.players, room.communityCards);
-            const winAmount = Math.floor(room.pot / winners.length);
-            winners.forEach(w => { const p = room.players.find(pp => pp.id === w.id); if (p) p.chips += winAmount; });
 
             io.to(room.id).emit('gameEnd', {
                 players: playerListEx(room, ['hand']),
-                communityCards: room.communityCards, pot: room.pot,
+                communityCards: room.communityCards, pot: wonPot,
                 winners: winners.map(w => w.id), handName,
                 results: results.map(r => ({ playerId: r.player.id, handName: r.handName, handRank: r.handRank })),
                 dealer: room.dealer
@@ -395,7 +446,8 @@ function advancePhase(room) {
         return;
     }
 
-    // 重置本轮下注
+    // 重置本轮下注（先累计到总下注池）
+    room.players.forEach(p => p.totalPotBet = (p.totalPotBet || 0) + p.currentBet);
     room.currentBet = 0;
     room.players.forEach(p => p.currentBet = 0);
     room.actedThisPhase = new Set(); // 重置本阶段已行动玩家
@@ -418,21 +470,16 @@ function advancePhase(room) {
         // 进入摊牌
         room.phase = 'showdown';
 
-        // 评估手牌，决定赢家
+        const wonPot = room.pot;
+        room.pot = 0;
+        // 评估手牌并分配奖池（含边池逻辑）
         const { winners, handName, results } = getWinners(room.players, room.communityCards);
-
-        // 分配奖池
-        const winAmount = Math.floor(room.pot / winners.length);
-        winners.forEach(w => {
-            const player = room.players.find(p => p.id === w.id);
-            if (player) player.chips += winAmount;
-        });
 
         // 先发 gameUpdate 亮出所有公共牌和 phase=showdown
         io.to(room.id).emit('gameUpdate', {
             players: playerListEx(room, ['hand']),
             communityCards: room.communityCards,
-            pot: room.pot,
+            pot: wonPot,
             currentBet: room.currentBet,
             currentPlayer: room.currentPlayer,
             phase: room.phase,
@@ -444,7 +491,7 @@ function advancePhase(room) {
             io.to(room.id).emit('gameEnd', {
                 players: playerListEx(room, ['hand']),
                 communityCards: room.communityCards,
-                pot: room.pot,
+                pot: wonPot,
                 winners: winners.map(w => w.id),
                 handName,
                 results: results.map(r => ({
@@ -566,7 +613,7 @@ io.on('connection', (socket) => {
 
         // 游戏已开始 → 以观战者身份加入
         if (room.gameStarted) {
-            const exists = room.players.find(p => p.name === playerName && !p.isSpectator);
+            const exists = room.players.find(p => p.name === playerName && !p.isSpectator && !p.disconnected);
             if (exists) { callback({ success: false, error: '名字已被使用' }); return; }
 
             const player = {
@@ -842,14 +889,15 @@ io.on('connection', (socket) => {
         const nonFolded = room.players.filter(p => !p.folded && !p.isSpectator && !p.disconnected);
         if (nonFolded.length === 1) {
             const winner = nonFolded[0];
-            winner.chips += room.pot;
+            const wonPot = room.pot;
+            winner.chips += wonPot;
             room.pot = 0;
             room.phase = 'showdown';
 
             io.to(room.id).emit('gameEnd', {
                 players: playerListEx(room, ['hand']),
                 communityCards: room.communityCards,
-                pot: 0,
+                pot: wonPot,
                 winners: [winner.id],
                 handName: '对手全弃牌',
                 results: room.players
@@ -1065,12 +1113,13 @@ io.on('connection', (socket) => {
             const nonFolded = room.players.filter(p => !p.folded && !p.isSpectator && !p.disconnected);
             if (nonFolded.length === 1) {
                 const winner = nonFolded[0];
-                winner.chips += room.pot;
+                const wonPot = room.pot;
+                winner.chips += wonPot;
                 room.pot = 0;
                 room.phase = 'showdown';
                 io.to(room.id).emit('gameEnd', {
                     players: playerListEx(room, ['hand']),
-                    communityCards: room.communityCards, pot: 0,
+                    communityCards: room.communityCards, pot: wonPot,
                     winners: [winner.id], handName: '对手断线弃牌',
                     results: nonFolded.map(p => ({ playerId: p.id, handName: '对手断线弃牌', handRank: 0 })),
                     dealer: room.dealer
