@@ -929,10 +929,17 @@ io.on('connection', (socket) => {
             player.folded = true;
         } else if (action === 'call') {
             const toCall = room.currentBet - player.currentBet;
-            player.chips -= toCall;
-            player.currentBet = room.currentBet;
-            room.pot += toCall;
-            actualAmount = toCall;
+            // 筹码不够跟注时，只能全下自己剩下的筹码
+            let actualCall = toCall;
+            if (toCall > player.chips) {
+                actualCall = player.chips;
+                player.allIn = true;
+                console.log(`[call] ${player.name} 筹码不足跟注 ${toCall}，只能全下 ${actualCall}`);
+            }
+            player.chips -= actualCall;
+            player.currentBet += actualCall;
+            room.pot += actualCall;
+            actualAmount = actualCall;
         } else if (action === 'bet' || action === 'raise') {
             const betAmount = parseInt(amount) || 0;
             if (betAmount <= 0) {
