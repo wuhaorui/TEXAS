@@ -447,6 +447,9 @@
 
         /* 操作区域 */
         .action-area { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin-top: 15px; }
+        .timer-value { color: #4fc3f7; }
+        .timer-urgent { color: #f44336; animation: blink 0.5s infinite; }
+        @keyframes blink { 50% { opacity: 0.3; } }
 
         .action-btn {
             padding: 14px 24px;
@@ -808,6 +811,10 @@
                         <div class="info-item">
                             <span class="label">需跟注:</span>
                             <span class="value" id="to-call">0</span>
+                        </div>
+                        <div class="info-item timer-item">
+                            <span class="label">剩余时间:</span>
+                            <span class="value timer-value" id="action-timer">30s</span>
                         </div>
                     </div>
 
@@ -1606,16 +1613,58 @@
             enableActions(data);
         }
 
+        // ============ 行动倒计时 ============
+        const ACTION_TIMEOUT = 30; // 秒
+        let actionTimerInterval = null;
+        let actionTimerLeft = 0;
+
+        function startActionTimer() {
+            stopActionTimer();
+            actionTimerLeft = ACTION_TIMEOUT;
+            updateTimerDisplay();
+            actionTimerInterval = setInterval(() => {
+                actionTimerLeft--;
+                updateTimerDisplay();
+                if (actionTimerLeft <= 0) {
+                    stopActionTimer();
+                    console.log('[计时器] 超时，自动弃牌');
+                    playerAction('fold');
+                }
+            }, 1000);
+        }
+
+        function stopActionTimer() {
+            if (actionTimerInterval) {
+                clearInterval(actionTimerInterval);
+                actionTimerInterval = null;
+            }
+            const timerEl = document.getElementById('action-timer');
+            if (timerEl) {
+                timerEl.textContent = '--';
+                timerEl.classList.remove('timer-urgent');
+            }
+        }
+
+        function updateTimerDisplay() {
+            const timerEl = document.getElementById('action-timer');
+            if (!timerEl) return;
+            timerEl.textContent = actionTimerLeft + 's';
+            if (actionTimerLeft <= 5) {
+                timerEl.classList.add('timer-urgent');
+            } else {
+                timerEl.classList.remove('timer-urgent');
+            }
+        }
+
         function enableActions(data) {
             const myPlayerIndex = game.players.findIndex(p => p.id === game.playerId);
             const isMyTurn = myPlayerIndex === game.currentPlayer;
             const player = game.players[myPlayerIndex];
 
-            // 调试日志：打印 data 和 player 的关键字段
+            // 调试日志
             console.log('[enableActions] data.currentBet:', data.currentBet, '| player:', player);
             console.log('[enableActions] player.currentBet:', player ? player.currentBet : 'N/A');
 
-            // 详细日志：每轮下注都打印是谁的回合
             const currentPlayerName = game.players[game.currentPlayer]
                 ? game.players[game.currentPlayer].name
                 : '未知';
@@ -1631,19 +1680,24 @@
             const checkBtn = document.getElementById('check-btn');
             const betBtn = document.getElementById('bet-btn');
             const raiseBtn = document.getElementById('raise-btn');
+            const allinBtn = document.querySelector('.action-btn.all-in');
             const betInput = document.getElementById('bet-amount');
 
             callBtn.style.display = 'none';
             checkBtn.style.display = 'none';
             betBtn.style.display = 'none';
             raiseBtn.style.display = 'none';
+            if (allinBtn) allinBtn.style.display = 'none';
             actionsDiv.style.display = 'none';
 
+            // 不是我的回合，停止计时器
             if (!isMyTurn || player.folded || player.allIn || game.phase === 'waiting' || game.isSpectator || player.isSpectator) {
+                stopActionTimer();
                 return;
             }
 
             actionsDiv.style.display = 'flex';
+            startActionTimer();
 
             // 防御性处理：currentBet 可能为 undefined
             const dataCurrentBet = data.currentBet || 0;
@@ -1654,6 +1708,12 @@
             document.getElementById('current-bet').textContent = playerCurrentBet;
             document.getElementById('to-call').textContent = toCall;
 
+            // 判断是否只剩2人且对手已all-in（筹码少的一方）
+            const nonFolded = game.players.filter(p => !p.folded && !p.isSpectator && !p.disconnected);
+            const opponentAllIn = nonFolded.length === 2 && nonFolded.find(p => p.id !== game.playerId && p.allIn);
+            // 如果对手已all-in且筹码比你少，你只能跟注
+            const cantRaiseAllin = opponentAllIn && toCall >= game.myChips;
+
             if (toCall <= 0) {
                 checkBtn.style.display = 'block';
                 betBtn.style.display = 'block';
@@ -1661,10 +1721,14 @@
             } else {
                 callBtn.style.display = 'block';
                 callBtn.textContent = toCall >= game.myChips ? '全下' : `跟注 ${toCall}`;
-                if (game.myChips > toCall) {
+                if (game.myChips > toCall && !opponentAllIn) {
                     raiseBtn.style.display = 'block';
                     betBtn.style.display = 'block';
                 }
+            }
+            // 全下按钮：只有当没有被对手all-in限制时才显示
+            if (!opponentAllIn || toCall >= game.myChips) {
+                if (allinBtn) allinBtn.style.display = 'block';
             }
         }
 
