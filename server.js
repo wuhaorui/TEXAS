@@ -453,6 +453,12 @@ function advancePhase(room) {
     // 所有非弃牌玩家都 allIn → 快进到摊牌，一次性发完所有公共牌
     if (nonFolded.length >= 2 && nonFolded.every(p => p.allIn)) {
         console.log('[advancePhase] 所有玩家 allIn，快进到摊牌');
+        // 先把当前轮的 currentBet 计入 totalPotBet
+        room.players.forEach(p => p.totalPotBet = (p.totalPotBet || 0) + p.currentBet);
+        room.currentBet = 0;
+        room.players.forEach(p => p.currentBet = 0);
+        room.actedThisPhase = new Set();
+
         if (room.phase === 'preflop') for (let i = 0; i < 5; i++) room.communityCards.push(room.deck.pop());
         else if (room.phase === 'flop') { room.communityCards.push(room.deck.pop()); room.communityCards.push(room.deck.pop()); }
         else if (room.phase === 'turn') room.communityCards.push(room.deck.pop());
