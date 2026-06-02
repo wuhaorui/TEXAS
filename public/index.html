@@ -824,7 +824,7 @@
                         <button class="action-btn call" id="call-btn" onclick="playerAction('call')" style="display:none">跟注</button>
                         <button class="action-btn bet" id="bet-btn" onclick="playerAction('bet')">下注</button>
                         <div class="bet-controls">
-                            <input type="number" class="bet-input" id="bet-amount" min="0" placeholder="金额">
+                            <input type="number" class="bet-input" id="bet-amount" min="10" step="10" placeholder="金额(10的倍数)">
                         </div>
                         <button class="action-btn raise" id="raise-btn" onclick="playerAction('raise')" style="display:none">加注</button>
                         <button class="action-btn all-in" onclick="playerAction('allin')">全下</button>
@@ -1145,6 +1145,12 @@
             const data = window.currentGameData || {};
             const input = document.getElementById('bet-amount');
             const amount = parseInt(input.value) || 0;
+
+            // 下注/加注金额必须是10的倍数
+            if ((action === 'bet' || action === 'raise') && (amount <= 0 || amount % 10 !== 0)) {
+                alert('下注金额必须是10的倍数');
+                return;
+            }
 
             console.log('[playerAction]', action, 'socket.connected:', socket.connected, 'socket.id:', socket.id);
 

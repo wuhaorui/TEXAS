@@ -174,34 +174,35 @@ function getWinners(players, communityCards) {
     });
 
     // --- 边池分配 ---
-    // 按 totalPotBet 排序，从小到大处理各个贡献层级
-    const byContrib = [...results].sort((a, b) =>
-        (a.player.totalPotBet || 0) - (b.player.totalPotBet || 0)
-    );
-
+    // 所有玩家（含弃牌者）的贡献层级都需计入，弃牌者贡献的钱任何人可赢
+    const allContribs = [...new Set(players.map(p => p.totalPotBet || 0).filter(c => c > 0).sort((a, b) => a - b))];
     const winners = [];
     let prevLevel = 0;
 
-    for (const entry of byContrib) {
-        const level = entry.player.totalPotBet || 0;
+    for (const level of allContribs) {
         if (level <= prevLevel) continue;
         const increment = level - prevLevel;
 
-        // 找出参与此层级的所有玩家（totalPotBet >= level）
+        // 找出投入了此层级的活跃玩家
         const eligible = results.filter(r => (r.player.totalPotBet || 0) >= level);
-        if (eligible.length === 0) continue;
+        // 计算所有玩家（含弃牌者）中投入此层级的数量
+        const allInLevel = players.filter(p => (p.totalPotBet || 0) >= level).length;
+        if (eligible.length === 0) {
+            // 弃牌者独占此层级，钱归下层级赢家（算入 pot 但无人认领）
+            // 这种情况不分配，留给下面层级
+            prevLevel = level;
+            continue;
+        }
 
-        // 此层级子池大小 = increment * 参与人数
-        // 在 eligible 中按牌力排序选出最佳
-        const best = eligible[0]; // 已按牌力排序
-        // 找出所有并列最佳的
+        const best = eligible[0];
         const tied = eligible.filter(r =>
             r.handRank === best.handRank &&
             r.tieBreaker === best.tieBreaker &&
             JSON.stringify(r.values) === JSON.stringify(best.values)
         );
 
-        const share = Math.floor(increment * eligible.length / tied.length);
+        // 子池大小 = increment * 所有投入此层级的玩家数
+        const share = Math.floor(increment * allInLevel / tied.length);
         tied.forEach(r => {
             if (!winners.includes(r.player)) winners.push(r.player);
             r.player._sideWin = (r.player._sideWin || 0) + share;
