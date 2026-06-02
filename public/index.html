@@ -1388,18 +1388,20 @@
 
         socket.on('chatMessage', (data) => {
             game.chatMessages.push(data);
+            // 最多保留 20 条
+            if (game.chatMessages.length > 20) {
+                game.chatMessages = game.chatMessages.slice(-20);
+            }
             updateChatMessages();
         });
 
         function updateChatMessages() {
             const container = document.getElementById('chat-messages');
-            const maxLines = game.players.filter(p => !p.isSpectator).length || 1;
-            const entries = game.chatMessages.slice(-maxLines);
-            if (entries.length === 0) {
+            if (game.chatMessages.length === 0) {
                 container.innerHTML = '<div class="chat-empty">暂无消息</div>';
                 return;
             }
-            container.innerHTML = entries.map(e => `
+            container.innerHTML = game.chatMessages.map(e => `
                 <div class="chat-msg">
                     <span class="msg-name">${e.name}:</span>
                     <span class="msg-text">${e.text}</span>
