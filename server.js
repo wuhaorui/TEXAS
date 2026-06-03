@@ -948,12 +948,18 @@ io.on('connection', (socket) => {
             room.pot += actualCall;
             actualAmount = actualCall;
         } else if (action === 'bet' || action === 'raise') {
-            const betAmount = parseInt(amount) || 0;
+            let betAmount = parseInt(amount) || 0;
             if (betAmount <= 0) {
                 callback({ success: false, error: '下注金额必须大于0' });
                 return;
             }
+            // 不能超过剩余筹码
+            if (betAmount > player.chips) {
+                betAmount = player.chips;
+                console.log(`[bet/raise] ${player.name} 筹码不足，实际下注 ${betAmount}`);
+            }
             player.chips -= betAmount;
+            if (player.chips === 0) player.allIn = true;
             player.currentBet += betAmount;
             room.pot += betAmount;
             room.currentBet = player.currentBet;
