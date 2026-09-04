@@ -1367,11 +1367,16 @@
             alert(`${data.playerName} 离开了房间`);
         });
 
+        // 玩家被永久移除（断线超时）后由服务端下发，用于刷新座位并提示房间状态
+        socket.on('playerRemoved', (data) => {
+            console.log('[playerRemoved]', data);
+            if (data.message) alert(data.message);
+        });
+
         socket.on('gameStarted', (data) => {
             console.log('游戏开始!', data);
-            // 关闭上一局的结束弹窗，清空行动日志
+            // 关闭上一局的结束弹窗
             document.getElementById('game-end-modal').style.display = 'none';
-            clearActionLog();
             document.getElementById('waiting-section').style.display = 'none';
             document.getElementById('playing-area').style.display = 'block';
 
@@ -1380,11 +1385,15 @@
             game.myHand = me && me.hand ? [...me.hand] : [];
             game.isSpectator = me ? (me.isSpectator || false) : false;
 
-            // 观战者不显示新局弹窗
-            if (game.isSpectator) {
+            // silent=true：这不是新的一局，只是「玩家移除后同步座位/状态」，
+            // 不弹新对局弹窗、不清空行动日志与公共牌，避免打断进行中的牌局
+            if (data.silent || game.isSpectator) {
                 updateGameState(data);
                 return;
             }
+
+            // 清空行动日志
+            clearActionLog();
 
             // 清空公共牌显示
             const communityCards = document.querySelectorAll('#community-cards .card');

@@ -20,6 +20,13 @@ const BIG_BLIND = 20;
 const MIN_PLAYERS = 2;
 const MAX_PLAYERS = 8;
 
+// 断线后多久真正把玩家移出房间（默认 60 秒，给移动端切后台重连留窗口）。
+// 端到端测试可用环境变量 DISCONNECT_TIMEOUT_MS 调短，生产环境不要设置。
+const DISCONNECT_TIMEOUT_MS = (() => {
+    const v = Number(process.env.DISCONNECT_TIMEOUT_MS);
+    return Number.isFinite(v) && v >= 0 ? v : 60000;
+})();
+
 // ============ 数据存储 ============
 const rooms = {}; // { roomId: Room }
 
@@ -80,24 +87,27 @@ function evaluateHand(cards) {
 
     let handRank, handName, tieBreaker, bestValues;
 
-    if (isFlush && (isStraight || isWheel)) {
-        // 同花顺：用同花花色的牌判断顺子
+    // 同花顺：必须是「同花花色」内部形成的顺子，不能因跨花色出现顺子而误判。
+    // 先只在 flush 花色的牌里找顺子，成立才判同花顺，否则落到下面的普通同花分支。
+    let isStraightFlush = false;
+    let sfHigh = 0;
+    let isWheelFlush = false;
+    if (flushSuit) {
         const fv = flushValues;
-        let sfHigh = 0;
         for (let i = 0; i <= fv.length - 5; i++) {
-            if (fv[i] - fv[i + 4] === 4) {
-                sfHigh = fv[i];
-                break;
-            }
+            if (fv[i] - fv[i + 4] === 4) { sfHigh = fv[i]; break; }
         }
-        // 检查 A-2-3-4-5 同花顺
-        const isWheelFlush = !sfHigh && fv.includes(5) && fv.includes(4)
+        isWheelFlush = !sfHigh && fv.includes(5) && fv.includes(4)
             && fv.includes(3) && fv.includes(2) && fv.includes(14);
-        const isRoyal = (sfHigh === 14) || (isWheelFlush && fv[0] === 14 && fv.includes(10));
+        isStraightFlush = sfHigh > 0 || isWheelFlush;
+    }
+
+    if (isStraightFlush) {
+        const isRoyal = sfHigh === 14;
         handName = isRoyal ? '皇家同花顺' : '同花顺';
         handRank = HAND_RANKS[handName];
-        tieBreaker = isWheelFlush ? 5 : (sfHigh || 5);
-        bestValues = isWheelFlush ? [5, 4, 3, 2, 1] : fv.slice(0, 5);
+        tieBreaker = isWheelFlush ? 5 : sfHigh;
+        bestValues = isWheelFlush ? [5, 4, 3, 2, 1] : [sfHigh, sfHigh - 1, sfHigh - 2, sfHigh - 3, sfHigh - 4];
     } else if (c1 === 4) {
         handName = '四条';
         handRank = HAND_RANKS[handName];
@@ -773,6 +783,223 @@ function advancePhase(room) {
     });
 }
 
+// ============ 玩家移除：全文件唯一的 splice 出口 ============
+//
+// TODO(中期重构): 把 room.currentPlayer / room.dealer / room.actedThisPhase /
+// room.lastRaiseIndex 从「数组下标」改成「玩家 id」（string / Set<playerId>），
+// 从根本上消除 splice 造成的下标错位。届时下面这一整套重映射逻辑可以整体删除，
+// 移除玩家时只需丢弃对应 id 即可。
+//
+// 在此之前：**任何地方都不要直接 splice room.players**，必须调用 removePlayerFromRoom()。
+
+// 从 from 开始向后找下一个「可行动」玩家（未弃牌、未 all-in、未观战、未断线）。
+// inclusive=false（默认）：跳过 from 本身，用于「把行动权交给下一位」。
+// inclusive=true：from 本身也算候选，用于「被删玩家腾出的位置由谁顶上」。
+// from 会先对数组长度取模，所以传入刚被删掉的旧下标也不会漏掉回绕到 0 的那一位。
+function nextActionableIndex(room, from, inclusive = false) {
+    const n = room.players.length;
+    if (n === 0) return -1;
+    const start = ((from % n) + n) % n;
+    for (let i = (inclusive ? 0 : 1); i < n; i++) {
+        const idx = (start + i) % n;
+        const p = room.players[idx];
+        if (p && !p.folded && !p.allIn && !p.isSpectator && !p.disconnected) return idx;
+    }
+    return -1;
+}
+
+// 玩家被 splice 出 room.players **之后**，把所有「数组下标」状态重映射到新数组：
+//   - 旧下标 > removedIndex：整体前移一位（-1）
+//   - 旧下标 === removedIndex：按语义重新定位（不能简单丢弃，也不能靠 -1 蒙混）
+//   - 旧下标 < removedIndex：不变
+function remapStateAfterPlayerRemoval(room, removedIndex, successorIndex = -1) {
+    const n = room.players.length; // 移除「后」的长度
+    const shift = idx => (idx > removedIndex ? idx - 1 : idx);
+
+    // ---- currentPlayer：行动权 ----
+    // 只有「被删者本人就是当前行动者」才需要重新定位；其余情况一律按位移处理
+    // （currentPlayer > removedIndex → -1，否则不变）。越界的脏下标交给
+    // 后面的 normalizeRoomIndices() 取模兜底，不要在这里抢着重定位，
+    // 否则会把「被删者排在行动者前面」这种最常见的场景误判成移交行动权。
+    if (room.currentPlayer === removedIndex) {
+        // 被删者正是当前行动者：交给调用方在旧数组里算好的继承者（也要 -1 位移）
+        let next = successorIndex >= 0 ? shift(successorIndex) : -1;
+        // 兜底：没算出来就在新数组里从被删位置（含）重新找一遍
+        if (next < 0 || next >= n) next = nextActionableIndex(room, removedIndex, true);
+        room.currentPlayer = next >= 0 ? next : (n > 0 ? 0 : -1);
+    } else {
+        room.currentPlayer = shift(room.currentPlayer);
+    }
+
+    // ---- dealer：庄家 ----
+    // 被删者就是庄家时，庄家顺延到前一个位置，保持其余玩家的相对顺序不变，
+    // 这样下一局 startNewHand() 里的 (dealer + 1) % n 轮转不会被打乱。
+    if (room.dealer === removedIndex) {
+        room.dealer = n > 0 ? (removedIndex - 1 + n) % n : 0;
+    } else {
+        room.dealer = shift(room.dealer);
+    }
+
+    // ---- lastRaiseIndex：最后一个完整加注者 ----
+    if (room.lastRaiseIndex === removedIndex) {
+        room.lastRaiseIndex = -1;
+    } else if (room.lastRaiseIndex >= 0) {
+        const s = shift(room.lastRaiseIndex);
+        room.lastRaiseIndex = (s >= 0 && s < n) ? s : -1;
+    }
+
+    // ---- actedThisPhase（Set<下标>）：整体重建，丢弃被删者 + 越界脏数据 ----
+    const oldSet = (room.actedThisPhase instanceof Set) ? room.actedThisPhase : new Set();
+    const newSet = new Set();
+    for (const idx of oldSet) {
+        if (idx === removedIndex) continue;
+        const s = shift(idx);
+        if (s >= 0 && s < n) newSet.add(s);
+    }
+    room.actedThisPhase = newSet;
+}
+
+// 一致性兜底：currentPlayer / dealer 必须落在 [0, players.length - 1]，越界对 length 取模
+function normalizeRoomIndices(room) {
+    const n = room.players.length;
+    const wrap = (v, fallback) => {
+        const num = Number(v);
+        if (!Number.isFinite(num) || n === 0) return fallback;
+        return ((Math.trunc(num) % n) + n) % n;
+    };
+    room.currentPlayer = n === 0 ? -1 : wrap(room.currentPlayer, 0);
+    room.dealer = wrap(room.dealer, 0);
+    if (!Number.isFinite(room.lastRaiseIndex) || room.lastRaiseIndex >= n) room.lastRaiseIndex = -1;
+    if (!(room.actedThisPhase instanceof Set)) room.actedThisPhase = new Set();
+}
+
+/**
+ * 从房间里永久移除一个玩家 —— 全文件唯一允许 splice room.players 的地方。
+ * 负责：断线定时器清理 → 行动权/庄家/已行动集合下标重映射 → 一致性兜底 →
+ * 房主转让 → 人数不足回到 waiting → 广播完整状态。
+ *
+ * @param {object} room        房间对象
+ * @param {number} playerIndex 待移除玩家在 room.players 中的下标
+ * @returns {object|null}      被移除的玩家对象；未移除返回 null
+ */
+function removePlayerFromRoom(room, playerIndex) {
+    if (!room || !Array.isArray(room.players)) return null;
+    if (!Number.isInteger(playerIndex) || playerIndex < 0 || playerIndex >= room.players.length) return null;
+
+    const removed = room.players[playerIndex];
+    if (!removed) return null;
+
+    // 0) 清掉挂在玩家身上的断线移除定时器，防止重复移除
+    if (removed._disconnectTimer) {
+        clearTimeout(removed._disconnectTimer);
+        removed._disconnectTimer = null;
+    }
+
+    const wasHost = !!removed.isHost;
+    const wasCurrentActor = room.currentPlayer === playerIndex;
+
+    // 1) 移除「前」先在旧数组坐标系里算好行动权继承者：
+    //    splice 之后数组变短，再去找就会漏掉回绕到下标 0 的那一位。
+    const successorIndex = wasCurrentActor ? nextActionableIndex(room, playerIndex) : -1;
+
+    console.log(`[移除玩家] ${removed.name} (旧下标 ${playerIndex}) 房间 ${room.id} | ` +
+        `是当前行动者:${wasCurrentActor} 继承者(旧下标):${successorIndex} | ` +
+        `人数 ${room.players.length}→${room.players.length - 1}`);
+
+    // 2) 执行移除（唯一一处 splice）
+    room.players.splice(playerIndex, 1);
+
+    // 3) 重映射所有下标类状态
+    remapStateAfterPlayerRemoval(room, playerIndex, successorIndex);
+
+    // 4) 一致性兜底
+    normalizeRoomIndices(room);
+
+    // 5) 被删者是当前行动者且无人接手（其余人全弃牌/全下/断线）→ 推进阶段，避免死锁
+    if (wasCurrentActor && successorIndex === -1 &&
+        room.gameStarted && room.phase !== 'waiting' && room.phase !== 'showdown') {
+        console.log('[移除玩家] 当前行动者被移除且无人接手，推进阶段');
+        advancePhase(room);
+    }
+
+    // 6) 房主转让（游戏进行中也可能转让，不能只在 !gameStarted 时处理）
+    if (wasHost) {
+        const newHost = room.players.find(p => !p.isSpectator && !p.disconnected) || room.players[0];
+        if (newHost) {
+            newHost.isHost = true;
+            io.to(room.id).emit('newHost', { hostId: newHost.id });
+            console.log(`[移除玩家] 房主转让给 ${newHost.name}`);
+        }
+    }
+
+    // 7) 人数不足：结束当前手牌，回到 waiting
+    let notice = null;
+    if (room.players.length < 2) {
+        // 剩余底池归最后一位玩家，避免筹码凭空消失
+        if (room.pot > 0 && room.players.length === 1) {
+            room.players[0].chips += room.pot;
+            console.log(`[移除玩家] 底池 ${room.pot} 归 ${room.players[0].name}`);
+        }
+        room.pot = 0;
+        room.currentBet = 0;
+        room.minRaise = room.bigBlind;
+        room.lastRaiseIndex = -1;
+        room.communityCards = [];
+        room.actedThisPhase = new Set();
+        room.phase = 'waiting';
+        room.gameStarted = false;
+        room.players.forEach(p => {
+            p.hand = [];
+            p.currentBet = 0;
+            p.totalPotBet = 0;
+            p.folded = false;
+            p.allIn = false;
+            p.ready = false;
+        });
+        normalizeRoomIndices(room);
+        notice = '人数不足，等待新玩家';
+    }
+
+    // 8) 广播完整状态，避免前端停留在旧座位布局
+    io.to(room.id).emit('playerJoined', { players: playerList(room) });
+    io.to(room.id).emit('playerRemoved', {
+        playerId: removed.id,
+        playerName: removed.name,
+        dealer: room.dealer,
+        currentPlayer: room.currentPlayer,
+        message: notice
+    });
+    if (notice) {
+        io.to(room.id).emit('chatMessage', { name: '系统', text: notice });
+        console.log(`[移除玩家] 房间 ${room.id}：${notice}`);
+    }
+
+    if (room.gameStarted && room.phase !== 'waiting') {
+        io.to(room.id).emit('gameStarted', {
+            dealer: room.dealer,
+            players: playerListEx(room, ['hand']),
+            communityCards: room.communityCards,
+            pot: room.pot,
+            currentBet: room.currentBet, minRaise: room.minRaise,
+            phase: room.phase,
+            currentPlayer: room.currentPlayer,
+            smallBlind: room.smallBlind,
+            bigBlind: room.bigBlind,
+            silent: true // 仅为同步座位/状态，前端不要弹「新对局开始」弹窗
+        });
+    } else {
+        io.to(room.id).emit('gameUpdate', {
+            players: playerList(room),
+            communityCards: room.communityCards, pot: room.pot,
+            currentBet: room.currentBet, minRaise: room.minRaise,
+            currentPlayer: room.currentPlayer,
+            phase: room.phase, dealer: room.dealer
+        });
+    }
+
+    return removed;
+}
+
 // ============ Socket 处理 ============
 io.on('connection', (socket) => {
     console.log('用户连接:', socket.id);
@@ -1364,7 +1591,7 @@ io.on('connection', (socket) => {
         });
     });
 
-    // 断开连接（不立即删除，给移动端切后台重连留窗口期）
+    // 断开连接（不立即删除，给移动端切后台重连留 60 秒窗口期）
     socket.on('disconnect', (reason) => {
         console.log('=== DISCONNECT ===');
         console.log('socket.id:', socket.id, 'playerId:', socket.playerId, 'roomId:', socket.roomId, 'reason:', reason);
@@ -1446,23 +1673,28 @@ io.on('connection', (socket) => {
         }
 
         // 60 秒后如果还没重连，真正移除
+        // 统一走 removePlayerFromRoom：内部负责下标重映射 / 房主转让 / 广播，禁止在这里直接 splice
         const disconnectTimer = setTimeout(() => {
             const currentRoom = rooms[socket.roomId];
-            if (currentRoom) {
-                const pi = currentRoom.players.findIndex(p => p.id === socket.playerId);
-                if (pi !== -1 && currentRoom.players[pi].disconnected) {
-                    console.log('[断线超时] 移除玩家:', currentRoom.players[pi].name);
-                    currentRoom.players.splice(pi, 1);
-                    if (currentRoom.players.length === 0) {
-                        delete rooms[socket.roomId];
-                    } else if (currentRoom.players[pi] && currentRoom.players[pi].isHost) {
-                        // 原房主被移除，转让给第一个活跃玩家
-                        const newHost = currentRoom.players.find(p => !p.isSpectator && !p.disconnected) || currentRoom.players[0];
-                        if (newHost) { newHost.isHost = true; io.to(currentRoom.id).emit('newHost', { hostId: newHost.id }); }
-                    }
-                }
+            if (!currentRoom) return;
+
+            const pi = currentRoom.players.findIndex(p => p.id === socket.playerId);
+            if (pi === -1 || !currentRoom.players[pi].disconnected) return;
+
+            const removed = removePlayerFromRoom(currentRoom, pi);
+            if (!removed) return;
+
+            console.log('[断线超时] 已移除玩家:', removed.name, '(旧下标:', pi, ')',
+                '| 剩余人数:', currentRoom.players.length,
+                '| dealer:', currentRoom.dealer, 'currentPlayer:', currentRoom.currentPlayer,
+                '| acted:', [...currentRoom.actedThisPhase]);
+
+            // 房间空了就销毁
+            if (currentRoom.players.length === 0) {
+                console.log('[断线超时] 房间已空，销毁房间', socket.roomId);
+                delete rooms[socket.roomId];
             }
-        }, 60000);
+        }, DISCONNECT_TIMEOUT_MS);
         player._disconnectTimer = disconnectTimer;
     });
 });
