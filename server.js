@@ -235,6 +235,158 @@ function getWinners(players, communityCards) {
     return { winners: allWinners, handName: results[0].handName, results };
 }
 
+// ============ 下注合法性校验（纯函数，不修改任何状态） ============
+/**
+ * 统一校验一次下注动作是否合法，并把它归一化成可安全执行的结果。
+ *
+ * 关于 amount 的语义：前端传的是「本次要额外投入的筹码」（增量），
+ * 而不是「加注到的总注额」。所以：
+ *   加注后的总注额 target = player.currentBet + amount
+ *   合法加注要求       target >= room.currentBet + room.minRaise
+ *
+ * @param {object} room   房间对象
+ * @param {object} player 行动玩家对象
+ * @param {string} action fold | check | call | bet | raise | allin
+ * @param {number} amount 增量下注额（bet / raise 时使用）
+ *
+ * @returns {{
+ *   valid: boolean,
+ *   error?: string,
+ *   normalizedAmount?: number,   // 本次实际从 player.chips 扣掉的筹码（恒 >= 0）
+ *   action?: string,             // 归一化后的动作（call 可能变成 check / allin）
+ *   newPlayerBet?: number,       // 执行后 player.currentBet
+ *   newCurrentBet?: number,      // 执行后 room.currentBet
+ *   newMinRaise?: number,        // 执行后 room.minRaise
+ *   allIn?: boolean,             // 玩家是否因此 all-in
+ *   reopens?: boolean            // 是否是一次「完整加注」，需要重新开放本轮下注
+ * }}
+ */
+function validateBetAction(room, player, action, amount) {
+    const safeChips = Math.max(0, Number.isFinite(player.chips) ? player.chips : 0);
+    const playerBet = Math.max(0, Number.isFinite(player.currentBet) ? player.currentBet : 0);
+    const tableBet = Math.max(0, Number.isFinite(room.currentBet) ? room.currentBet : 0);
+    const minRaise = Math.max(0, Number.isFinite(room.minRaise) ? room.minRaise : 0);
+
+    const toCall = tableBet - playerBet;        // 补多少才能跟平（可能 <= 0）
+    const minTarget = tableBet + minRaise;      // 合法加注后的最低「总注额」
+    const maxTarget = playerBet + safeChips;    // 打光全部筹码能到的总注额
+
+    const base = { action, toCall, minTarget, maxTarget, allIn: false, reopens: false };
+
+    if (!action) return { ...base, valid: false, error: '未知操作' };
+
+    // 牌局未开始或已结束（摊牌展示期）：任何下注动作都不合法，
+    // 否则在结算后的 3~8 秒展示窗口里收到的动作会污染下一局的状态。
+    if (room.phase === 'waiting' || room.phase === 'showdown') {
+        return { ...base, valid: false, error: '本局已结束，请等待下一局开始' };
+    }
+
+    switch (action) {
+        // ---------- 弃牌：永远合法 ----------
+        case 'fold':
+            return { ...base, valid: true, normalizedAmount: 0 };
+
+        // ---------- 过牌：只有在无人领先时才合法 ----------
+        case 'check':
+            if (toCall > 0) {
+                // 筹码不够跟平时提示实际能跟的数额
+                const affordable = Math.min(toCall, safeChips);
+                return {
+                    ...base, valid: false,
+                    error: `当前有下注，不能过牌（需跟注 ${affordable}${affordable < toCall ? '，筹码不足将全下' : ''}）`
+                };
+            }
+            return { ...base, valid: true, normalizedAmount: 0 };
+
+        // ---------- 跟注：可能为 check / 正常跟注 / 全下 ----------
+        case 'call': {
+            // 无需补码（含 BB 未被人加注时的「过牌」选项）→ 归一化为过牌，不动筹码
+            if (toCall <= 0) {
+                return { ...base, valid: true, action: 'check', normalizedAmount: 0, newPlayerBet: playerBet };
+            }
+            const pay = Math.max(0, Math.min(toCall, safeChips)); // 恒 >= 0，杜绝负数
+            const isAllIn = pay >= safeChips;
+            return {
+                ...base,
+                valid: true,
+                action: isAllIn ? 'allin' : 'call',
+                normalizedAmount: pay,
+                newPlayerBet: playerBet + pay,
+                // 跟注不会抬高当前注额，minRaise 也不变
+                newCurrentBet: Math.max(tableBet, playerBet + pay),
+                newMinRaise: minRaise,
+                allIn: isAllIn,
+                reopens: false
+            };
+        }
+
+        // ---------- 下注 / 加注 ----------
+        case 'bet':
+        case 'raise': {
+            const raw = Number(amount);
+            if (!Number.isFinite(raw) || Math.floor(raw) <= 0) {
+                return { ...base, valid: false, error: '下注金额必须是大于 0 的整数' };
+            }
+            if (safeChips <= 0) {
+                return { ...base, valid: false, error: '没有筹码可以下注' };
+            }
+
+            const requestedTarget = playerBet + Math.floor(raw);
+            // 想下的超过身家 → 截断成 all-in（而不是拒绝）
+            const target = Math.min(requestedTarget, maxTarget);
+            const isAllIn = requestedTarget >= maxTarget;
+            const isFullRaise = target >= minTarget;
+
+            // 既达不到最小加注额，又不是 all-in → 明确拒绝并给出最小加注目标
+            if (!isFullRaise && !isAllIn) {
+                return {
+                    ...base, valid: false,
+                    error: `最小加注到 ${minTarget}（当前注额 ${tableBet}，最小加注增量 ${minRaise}）`
+                };
+            }
+            // 短码 all-in（投入全部筹码仍达不到 minTarget）：允许，但不重新开放下注
+
+            const pay = Math.max(0, target - playerBet);
+            const newCurrentBet = Math.max(tableBet, target); // 只允许抬高，绝不调低
+            return {
+                ...base,
+                valid: true,
+                action: isAllIn ? 'allin' : action,
+                normalizedAmount: pay,
+                newPlayerBet: target,
+                newCurrentBet,
+                // 完整加注才更新 minRaise = 加注后注额 - 加注前注额
+                newMinRaise: isFullRaise ? Math.max(minRaise, newCurrentBet - tableBet) : minRaise,
+                allIn: isAllIn,
+                reopens: isFullRaise
+            };
+        }
+
+        // ---------- 全下：永远合法 ----------
+        case 'allin': {
+            if (safeChips <= 0) {
+                return { ...base, valid: false, error: '没有筹码可以下注' };
+            }
+            const target = maxTarget;
+            const isFullRaise = target >= minTarget;
+            const newCurrentBet = Math.max(tableBet, target);
+            return {
+                ...base,
+                valid: true,
+                normalizedAmount: safeChips,
+                newPlayerBet: target,
+                newCurrentBet,
+                newMinRaise: isFullRaise ? Math.max(minRaise, newCurrentBet - tableBet) : minRaise,
+                allIn: true,
+                reopens: isFullRaise
+            };
+        }
+
+        default:
+            return { ...base, valid: false, error: `未知操作: ${action}` };
+    }
+}
+
 function createDeck() {
     const deck = [];
     for (const suit of SUITS) {
@@ -284,7 +436,7 @@ function skipDisconnectedCurrent(room) {
         setTimeout(() => {
             handleRebuy(room);
             const ep = room.players.filter(p => p.chips >= room.bigBlind && !p.isSpectator && !p.disconnected);
-            if (ep.length >= 2) { startNewHand(room); io.to(room.id).emit('gameStarted', { players: playerListEx(room, ['hand']), dealer: room.dealer, phase: room.phase, currentPlayer: room.currentPlayer, pot: room.pot, currentBet: room.currentBet, smallBlind: room.smallBlind, bigBlind: room.bigBlind }); }
+            if (ep.length >= 2) { startNewHand(room); io.to(room.id).emit('gameStarted', { players: playerListEx(room, ['hand']), dealer: room.dealer, phase: room.phase, currentPlayer: room.currentPlayer, pot: room.pot, currentBet: room.currentBet, minRaise: room.minRaise, smallBlind: room.smallBlind, bigBlind: room.bigBlind }); }
         }, 3000);
     } else if (nextPlayer === -1) {
         advancePhase(room);
@@ -293,7 +445,7 @@ function skipDisconnectedCurrent(room) {
         io.to(room.id).emit('gameUpdate', {
             players: playerList(room),
             communityCards: room.communityCards, pot: room.pot,
-            currentBet: room.currentBet, currentPlayer: room.currentPlayer,
+            currentBet: room.currentBet, minRaise: room.minRaise, currentPlayer: room.currentPlayer,
             phase: room.phase, dealer: room.dealer
         });
     }
@@ -349,7 +501,12 @@ function createRoom(hostId, hostName, initialChips) {
         bigBlind: BIG_BLIND,
         initialChips: initialChips,
         gameStarted: false,
-        createdAt: Date.now()
+        createdAt: Date.now(),
+        // ---- 下注规则状态 ----
+        // minRaise: 当前最小加注「增量」（不是总注额）。startNewHand 时重置为 bigBlind。
+        minRaise: BIG_BLIND,
+        // lastRaiseIndex: 最后一次「完整加注」的玩家索引，用于判断一轮下注是否结束
+        lastRaiseIndex: -1
     };
     return roomId;
 }
@@ -363,6 +520,10 @@ function startNewHand(room) {
     room.pot = 0;
     room.currentBet = 0;
     room.phaseBets = {};
+    // 重置本局下注规则：最小加注增量 = 大盲，尚无人加注
+    room.minRaise = room.bigBlind;
+    room.lastRaiseIndex = -1;
+    room.previousBet = 0;
 
     // 将观战者升级为正式玩家（发筹码）
     room.players.forEach(p => {
@@ -391,13 +552,20 @@ function startNewHand(room) {
     const sbIndex = (room.dealer + 1) % room.players.length;
     const bbIndex = (room.dealer + 2) % room.players.length;
 
-    room.players[sbIndex].chips -= room.smallBlind;
-    room.players[sbIndex].currentBet = room.smallBlind;
-    room.players[bbIndex].chips -= room.bigBlind;
-    room.players[bbIndex].currentBet = room.bigBlind;
+    // 收盲注：短码玩家最多只能投入全部筹码，底池按实际投入累加（保证筹码守恒、非负）
+    const sbPlayer = room.players[sbIndex];
+    const bbPlayer = room.players[bbIndex];
+    const sbPut = Math.min(room.smallBlind, Math.max(0, sbPlayer.chips));
+    const bbPut = Math.min(room.bigBlind, Math.max(0, bbPlayer.chips));
+    sbPlayer.chips = Math.max(0, sbPlayer.chips - sbPut);
+    sbPlayer.currentBet = sbPut;
+    if (sbPlayer.chips === 0) sbPlayer.allIn = true;
+    bbPlayer.chips = Math.max(0, bbPlayer.chips - bbPut);
+    bbPlayer.currentBet = bbPut;
+    if (bbPlayer.chips === 0) bbPlayer.allIn = true;
 
-    room.pot = room.smallBlind + room.bigBlind;
-    room.currentBet = room.bigBlind;
+    room.pot = sbPut + bbPut;
+    room.currentBet = Math.max(0, bbPut);
     room.currentPlayer = (bbIndex + 1) % room.players.length;
     room.phase = 'preflop';
     room.actedThisPhase = new Set(); // 重置本阶段已行动玩家
@@ -441,7 +609,7 @@ function advancePhase(room) {
                     phase: room.phase,
                     currentPlayer: room.currentPlayer,
                     pot: room.pot,
-                    currentBet: room.currentBet,
+                    currentBet: room.currentBet, minRaise: room.minRaise,
                     smallBlind: room.smallBlind,
                     bigBlind: room.bigBlind
                 });
@@ -469,7 +637,7 @@ function advancePhase(room) {
             players: playerList(room),
             communityCards: room.communityCards,
             pot: room.pot,
-            currentBet: room.currentBet,
+            currentBet: room.currentBet, minRaise: room.minRaise,
             currentPlayer: room.currentPlayer,
             phase: room.phase,
             dealer: room.dealer
@@ -497,7 +665,7 @@ function advancePhase(room) {
             const ep = room.players.filter(p => p.chips >= room.bigBlind && !p.isSpectator && !p.disconnected);
             if (ep.length >= 2) {
                 startNewHand(room);
-                io.to(room.id).emit('gameStarted', { players: playerListEx(room, ['hand']), dealer: room.dealer, phase: room.phase, currentPlayer: room.currentPlayer, pot: room.pot, currentBet: room.currentBet, smallBlind: room.smallBlind, bigBlind: room.bigBlind });
+                io.to(room.id).emit('gameStarted', { players: playerListEx(room, ['hand']), dealer: room.dealer, phase: room.phase, currentPlayer: room.currentPlayer, pot: room.pot, currentBet: room.currentBet, minRaise: room.minRaise, smallBlind: room.smallBlind, bigBlind: room.bigBlind });
             }
         }, 8000);
         return;
@@ -506,6 +674,9 @@ function advancePhase(room) {
     // 重置本轮下注（先累计到总下注池）
     room.players.forEach(p => p.totalPotBet = (p.totalPotBet || 0) + p.currentBet);
     room.currentBet = 0;
+    // 新的一轮下注：最小加注增量回到大盲，尚无人加注
+    room.minRaise = room.bigBlind;
+    room.lastRaiseIndex = -1;
     room.players.forEach(p => p.currentBet = 0);
     room.actedThisPhase = new Set(); // 重置本阶段已行动玩家
 
@@ -537,7 +708,7 @@ function advancePhase(room) {
             players: playerListEx(room, ['hand']),
             communityCards: room.communityCards,
             pot: wonPot,
-            currentBet: room.currentBet,
+            currentBet: room.currentBet, minRaise: room.minRaise,
             currentPlayer: room.currentPlayer,
             phase: room.phase,
             dealer: room.dealer
@@ -572,7 +743,7 @@ function advancePhase(room) {
                     phase: room.phase,
                     currentPlayer: room.currentPlayer,
                     pot: room.pot,
-                    currentBet: room.currentBet,
+                    currentBet: room.currentBet, minRaise: room.minRaise,
                     smallBlind: room.smallBlind,
                     bigBlind: room.bigBlind
                 });
@@ -595,7 +766,7 @@ function advancePhase(room) {
         players: playerList(room),
         communityCards: room.communityCards,
         pot: room.pot,
-        currentBet: room.currentBet,
+        currentBet: room.currentBet, minRaise: room.minRaise,
         currentPlayer: room.currentPlayer,
         phase: room.phase,
         dealer: room.dealer  // 添加 dealer 字段，前端用于显示位置标识
@@ -716,7 +887,7 @@ io.on('connection', (socket) => {
                 initialChips: room.initialChips, isSpectator: true,
                 players: playerList(room),
                 gameState: { communityCards: room.communityCards, pot: room.pot,
-                    currentBet: room.currentBet, currentPlayer: room.currentPlayer,
+                    currentBet: room.currentBet, minRaise: room.minRaise, currentPlayer: room.currentPlayer,
                     phase: room.phase, dealer: room.dealer }
             });
             return;
@@ -895,7 +1066,7 @@ io.on('connection', (socket) => {
             players: playerListEx(room, ['hand']),
             communityCards: room.communityCards,
             pot: room.pot,
-            currentBet: room.currentBet,
+            currentBet: room.currentBet, minRaise: room.minRaise,
             phase: room.phase,
             currentPlayer: room.currentPlayer,
             smallBlind: room.smallBlind,
@@ -924,62 +1095,69 @@ io.on('connection', (socket) => {
             return;
         }
 
-        const { action, amount } = data;
+        const { action, amount } = data || {};
         const player = room.players[playerIndex];
 
         // 记录当前注额，用于判断是否有加注
         room.previousBet = room.currentBet;
 
-        // 计算实际发生的金额（用于行动日志显示）
-        let actualAmount = 0;
+        // ============ 1. 合法性校验（纯函数，失败时不动任何状态）============
+        const validation = validateBetAction(room, player, action, amount);
+        if (!validation.valid) {
+            console.log(
+                `[bet][拒绝] room=${room.id} player=${player.name} action=${action} amount=${amount} ` +
+                `currentBet=${room.currentBet} minRaise=${room.minRaise} → ${validation.error}`
+            );
+            callback({ success: false, error: validation.error });
+            return;
+        }
+
+        // ============ 2. 应用状态变更（所有加减都做非负 / 非 NaN 兜底）============
+        const beforeChips = player.chips;
+        const actualAmount = Math.max(0, Number.isFinite(validation.normalizedAmount) ? validation.normalizedAmount : 0);
+
         if (action === 'fold') {
             player.folded = true;
-        } else if (action === 'call') {
-            const toCall = room.currentBet - player.currentBet;
-            // 筹码不够跟注时，只能全下自己剩下的筹码
-            let actualCall = toCall;
-            if (toCall > player.chips) {
-                actualCall = player.chips;
-                player.allIn = true;
-                console.log(`[call] ${player.name} 筹码不足跟注 ${toCall}，只能全下 ${actualCall}`);
-            }
-            player.chips -= actualCall;
-            player.currentBet += actualCall;
-            room.pot += actualCall;
-            actualAmount = actualCall;
-        } else if (action === 'bet' || action === 'raise') {
-            let betAmount = parseInt(amount) || 0;
-            if (betAmount <= 0) {
-                callback({ success: false, error: '下注金额必须大于0' });
-                return;
-            }
-            // 不能超过剩余筹码
-            if (betAmount > player.chips) {
-                betAmount = player.chips;
-                console.log(`[bet/raise] ${player.name} 筹码不足，实际下注 ${betAmount}`);
-            }
-            player.chips -= betAmount;
-            if (player.chips === 0) player.allIn = true;
-            player.currentBet += betAmount;
-            room.pot += betAmount;
-            room.currentBet = player.currentBet;
-            actualAmount = betAmount;
-        } else if (action === 'allin') {
-            const allInAmount = player.chips;
-            player.chips = 0;
-            player.allIn = true;
-            player.currentBet += allInAmount;
-            room.pot += allInAmount;
-            if (player.currentBet > room.currentBet) {
-                room.currentBet = player.currentBet;
-            }
-            actualAmount = allInAmount;
         }
+
+        // 扣筹码：恒不超过持有量，恒 >= 0
+        const deduct = Math.min(actualAmount, Math.max(0, player.chips));
+        player.chips = Math.max(0, player.chips - deduct);
+        // 本轮已投入：优先用校验器算出的目标值，保证与 pot 增量一致
+        player.currentBet = Math.max(
+            0,
+            Number.isFinite(validation.newPlayerBet)
+                ? validation.newPlayerBet
+                : (player.currentBet || 0) + deduct
+        );
+        room.pot = Math.max(0, (room.pot || 0) + deduct);
+        // 当前注额只允许抬高，绝不调低（防止把 currentBet 压到盲注以下）
+        room.currentBet = Math.max(
+            room.currentBet || 0,
+            Number.isFinite(validation.newCurrentBet) ? validation.newCurrentBet : player.currentBet
+        );
+        if (Number.isFinite(validation.newMinRaise)) {
+            room.minRaise = Math.max(0, validation.newMinRaise);
+        }
+        if (validation.allIn || player.chips === 0) {
+            player.allIn = true;
+        }
+        if (validation.reopens) {
+            room.lastRaiseIndex = playerIndex;
+        }
+
+        // ============ 3. 动作日志（一行 JSON，便于核对筹码流向）============
+        console.log(`[bet] ${JSON.stringify({
+            room: room.id, player: player.name, action: validation.action, amount: deduct,
+            beforeChips, afterChips: player.chips, pot: room.pot,
+            playerBet: player.currentBet, tableBet: room.currentBet, tableMinRaise: room.minRaise,
+            allIn: !!player.allIn, phase: room.phase
+        })}`);
 
         io.to(room.id).emit('playerAction', {
             playerId: socket.playerId,
-            action,
-            amount: actualAmount
+            action: validation.action, // 用归一化后的动作（call 可能已被转成 check / allin）
+            amount: deduct
         });
 
         // 记录本阶段已行动的玩家
@@ -1022,7 +1200,7 @@ io.on('connection', (socket) => {
                         phase: room.phase,
                         currentPlayer: room.currentPlayer,
                         pot: room.pot,
-                        currentBet: room.currentBet,
+                        currentBet: room.currentBet, minRaise: room.minRaise,
                         smallBlind: room.smallBlind,
                         bigBlind: room.bigBlind
                     });
@@ -1033,11 +1211,11 @@ io.on('connection', (socket) => {
             return;
         }
 
-        // 如果有人下注/加注/全下（提高了当前注额），重置其他玩家的已行动标记
-        // 这样其他玩家需要再次行动来跟注或加注
-        const betActions = ['bet', 'raise', 'allin'];
-        if (betActions.includes(action) && room.currentBet > (room.previousBet || 0)) {
-            // 重置其他玩家的已行动标记（当前玩家已记录）
+        // 只有「完整加注」才会重新开放本轮下注，让其他玩家需要再次行动。
+        // 注意：短码 all-in（达不到最小加注额）不重新开放——reopens 为 false。
+        // 旧的 room.currentBet > room.previousBet 判断会在短码 all-in 时错误地重置已行动标记。
+        if (validation.reopens) {
+            room.lastRaiseIndex = playerIndex;
             room.actedThisPhase.clear();
             room.actedThisPhase.add(playerIndex);
         }
@@ -1078,7 +1256,7 @@ io.on('connection', (socket) => {
                 players: playerList(room),
                 communityCards: room.communityCards,
                 pot: room.pot,
-                currentBet: room.currentBet,
+                currentBet: room.currentBet, minRaise: room.minRaise,
                 currentPlayer: room.currentPlayer,
                 phase: room.phase,
                 dealer: room.dealer
@@ -1179,7 +1357,7 @@ io.on('connection', (socket) => {
             }),
             communityCards: room.communityCards,
             pot: room.pot,
-            currentBet: room.currentBet,
+            currentBet: room.currentBet, minRaise: room.minRaise,
             currentPlayer: room.currentPlayer,
             phase: room.phase,
             dealer: room.dealer
@@ -1251,7 +1429,7 @@ io.on('connection', (socket) => {
                     const ep = room.players.filter(p => p.chips >= room.bigBlind && !p.isSpectator && !p.disconnected);
                     if (ep.length >= 2) {
                         startNewHand(room);
-                        io.to(room.id).emit('gameStarted', { players: playerListEx(room, ['hand']), dealer: room.dealer, phase: room.phase, currentPlayer: room.currentPlayer, pot: room.pot, currentBet: room.currentBet, smallBlind: room.smallBlind, bigBlind: room.bigBlind });
+                        io.to(room.id).emit('gameStarted', { players: playerListEx(room, ['hand']), dealer: room.dealer, phase: room.phase, currentPlayer: room.currentPlayer, pot: room.pot, currentBet: room.currentBet, minRaise: room.minRaise, smallBlind: room.smallBlind, bigBlind: room.bigBlind });
                     }
                 }, 3000);
             } else if (nextPlayer === -1) {
@@ -1261,7 +1439,7 @@ io.on('connection', (socket) => {
                 io.to(room.id).emit('gameUpdate', {
                     players: playerList(room),
                     communityCards: room.communityCards, pot: room.pot,
-                    currentBet: room.currentBet, currentPlayer: room.currentPlayer,
+                    currentBet: room.currentBet, minRaise: room.minRaise, currentPlayer: room.currentPlayer,
                     phase: room.phase, dealer: room.dealer
                 });
             }

@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<html lang="zh-CN" data-page-node-id="FkjxtNcQSK2z7g6NfWoMDR">
+<head data-page-node-id="emWevVNMxWLVnRzb9HdBDr">
+    <meta charset="UTF-8" data-page-node-id="fXQRADpoWUTquTCTrbEjWd">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" data-page-node-id="DfBtfNEBoMGZCtmY7tWUnE">
     <title>我自用德州扑克</title>
-    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=Noto+Sans+SC:wght@400;500;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=Noto+Sans+SC:wght@400;500;700&display=swap" rel="stylesheet" data-page-node-id="HZ2V7MMDgOLQ7WfNHYvflH">
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -489,6 +489,16 @@
 
         .bet-input:focus { outline: none; border-color: var(--gold-accent); }
 
+        /* 下注范围提示 / 非法原因 */
+        .bet-hint {
+            font-size: 0.78rem;
+            line-height: 1.3;
+            max-width: 150px;
+            color: rgba(255, 255, 255, 0.55);
+        }
+        .bet-hint.invalid { color: #ff8a80; font-weight: 700; }
+        .bet-hint.valid { color: var(--gold-accent); }
+
         /* 等待区域 */
         .waiting-section { text-align: center; padding: 30px; }
 
@@ -691,143 +701,144 @@
         }
     </style>
 </head>
-<body>
+<body data-page-node-id="hJpOsWsvxUAyir4kwJ91aL">
     <!-- 大厅界面 -->
-    <div id="lobby-screen" class="screen active">
-        <div class="lobby-container">
-            <h1 class="logo">TEXAS HOLD'EM</h1>
-            <p class="subtitle">我自用德州扑克</p>
+    <div id="lobby-screen" class="screen active" data-page-node-id="Y6f0JveaFVrS1BZnJ9PfDq">
+        <div class="lobby-container" data-page-node-id="DX8DYm7xBNQmhs5L6G2HPx">
+            <h1 class="logo" data-page-node-id="RuKXMNSteRiZ84MYBU4Hzb">TEXAS HOLD'EM</h1>
+            <p class="subtitle" data-page-node-id="BzybapxIY6v4b5RWdm8WhA">我自用德州扑克</p>
 
-            <div class="menu-card">
-                <h2 class="menu-title">创建房间</h2>
-                <input type="text" id="player-name" class="player-name-input" placeholder="输入你的昵称" maxlength="12">
-                <div class="chip-options" id="create-chip-options">
-                    <div class="chip-option" onclick="selectChip(this, 1000)">1,000</div>
-                    <div class="chip-option selected" onclick="selectChip(this, 2000)">2,000</div>
-                    <div class="chip-option" onclick="selectChip(this, 5000)">5,000</div>
+            <div class="menu-card" data-page-node-id="tbuHnuGOyGFarkxFcIXxA1">
+                <h2 class="menu-title" data-page-node-id="swxYHz4yapnNhT0EiECXzb">创建房间</h2>
+                <input type="text" id="player-name" class="player-name-input" placeholder="输入你的昵称" maxlength="12" data-page-node-id="oawyGX9jRsjryFMBDAXzOH">
+                <div class="chip-options" id="create-chip-options" data-page-node-id="n2Ng9b1FAYymsHaLvHwQEe">
+                    <div class="chip-option" onclick="selectChip(this, 1000)" data-page-node-id="2xePzLifZe0QX6FWKsICJu">1,000</div>
+                    <div class="chip-option selected" onclick="selectChip(this, 2000)" data-page-node-id="nwZxsAgNzBubTE4L7Ot3hH">2,000</div>
+                    <div class="chip-option" onclick="selectChip(this, 5000)" data-page-node-id="ramYeUz5kdC7kh46lHUkYj">5,000</div>
                 </div>
-                <button class="btn btn-primary" onclick="createRoom()">创建房间</button>
+                <button class="btn btn-primary" onclick="createRoom()" data-page-node-id="R70VDCiOWnjOmUjfZAeNbE">创建房间</button>
             </div>
 
-            <div class="menu-card">
-                <h2 class="menu-title">加入房间</h2>
-                <input type="text" id="join-room-id" class="player-name-input" placeholder="输入房间号或粘贴链接" maxlength="50" style="text-transform: uppercase;">
-                <input type="text" id="join-player-name" class="player-name-input" placeholder="输入你的昵称" maxlength="12">
-                <button class="btn btn-secondary" onclick="joinRoom()">加入</button>
+            <div class="menu-card" data-page-node-id="IsFixZ1KZLqEVYQ4ux1frt">
+                <h2 class="menu-title" data-page-node-id="EAZFwfgzhFGS3eJD1YXDRB">加入房间</h2>
+                <input type="text" id="join-room-id" class="player-name-input" placeholder="输入房间号或粘贴链接" maxlength="50" style="text-transform: uppercase;" data-page-node-id="Nr6igVABe6W9WxAH1HLk5L">
+                <input type="text" id="join-player-name" class="player-name-input" placeholder="输入你的昵称" maxlength="12" data-page-node-id="Ok0yIErtwyyV4CvxEP3IiR">
+                <button class="btn btn-secondary" onclick="joinRoom()" data-page-node-id="ITFbMhfpyJ900GTa12I2bn">加入</button>
             </div>
         </div>
     </div>
 
     <!-- 游戏等待界面 -->
-    <div id="game-screen" class="screen">
-        <div class="game-container">
-            <div class="table-header">
-                <div class="table-info">♠♥ 我自用德州扑克 ♦♣</div>
-                <div class="player-balance">
-                    <span class="balance-label">剩余:</span>
-                    <span class="balance-amount" id="player-balance">0</span>
+    <div id="game-screen" class="screen" data-page-node-id="pTVr0oUjYFqIEjAechu0Jd">
+        <div class="game-container" data-page-node-id="sDaoTpGjQAosMe5oANDx0a">
+            <div class="table-header" data-page-node-id="SJv6myCNgwTmYY0L0G5a1s">
+                <div class="table-info" data-page-node-id="6Qy2gawmdjGzwqpMmEoPP9">♠♥ 我自用德州扑克 ♦♣</div>
+                <div class="player-balance" data-page-node-id="n3nRI9v59MBGss71XjCwKW">
+                    <span class="balance-label" data-page-node-id="HHSjZGrUTiFhCpfZ4AvcpE">剩余:</span>
+                    <span class="balance-amount" id="player-balance" data-page-node-id="C40XKGLWNvw0bPFFmF3S1Z">0</span>
                 </div>
             </div>
 
             <!-- 自定义对话框：游戏结束 -->
-            <div class="modal-overlay" id="game-end-modal" style="display:none;">
-                <div class="modal-box">
-                    <div class="modal-title" id="game-end-title">🃏 游戏结束！</div>
-                    <div class="modal-message" id="game-end-message"></div>
-                    <button class="modal-btn" onclick="closeGameEndModal()">确定</button>
+            <div class="modal-overlay" id="game-end-modal" style="display:none;" data-page-node-id="CgUTCKgrG9jvnV05vsfevE">
+                <div class="modal-box" data-page-node-id="Bc0QUHknZtEaraFolu6a1f">
+                    <div class="modal-title" id="game-end-title" data-page-node-id="Fp6hsStR9M31Mc8kzIlYhK">🃏 游戏结束！</div>
+                    <div class="modal-message" id="game-end-message" data-page-node-id="I1iD5ATy6ZyCC307DxLjnC"></div>
+                    <button class="modal-btn" onclick="closeGameEndModal()" data-page-node-id="8ZDu3kHPQ1uFfBfPt471qV">确定</button>
                 </div>
             </div>
 
             <!-- 自定义对话框：新对局开始 -->
-            <div class="modal-overlay" id="new-hand-modal" style="display:none;">
-                <div class="modal-box">
-                    <div class="modal-title" id="new-hand-title">🃏 新对局开始！</div>
-                    <div class="modal-message" id="new-hand-message"></div>
-                    <button class="modal-btn" onclick="closeNewHandModal()">确定</button>
+            <div class="modal-overlay" id="new-hand-modal" style="display:none;" data-page-node-id="cbOGTnEf5YvXdxTd0X9m4s">
+                <div class="modal-box" data-page-node-id="C5h1W8eUj6dDIVs3qOfXWW">
+                    <div class="modal-title" id="new-hand-title" data-page-node-id="3P4ulUBUlqiMv5HvyYYEZy">🃏 新对局开始！</div>
+                    <div class="modal-message" id="new-hand-message" data-page-node-id="BFCKFPcA49ZMp6pse6ckqy"></div>
+                    <button class="modal-btn" onclick="closeNewHandModal()" data-page-node-id="ySIW15mUtna49pVRRCiWGm">确定</button>
                 </div>
             </div>
 
-            <div class="waiting-section" id="waiting-section">
-                <div class="room-info-box" id="room-info-box">
-                    <div class="room-id-display">房间号: <span id="display-room-id"></span></div>
-                    <div class="room-chips-display">初始筹码: <span id="display-room-chips"></span></div>
-                    <div class="share-row">
-                        <div class="share-link-text" id="display-share-link"></div>
-                        <button class="copy-btn" onclick="copyShareLink()">复制</button>
+            <div class="waiting-section" id="waiting-section" data-page-node-id="F7L6ztH6aeFsagkPAKIYoz">
+                <div class="room-info-box" id="room-info-box" data-page-node-id="yb2CiY4a94VWNvEr6RAVgp">
+                    <div class="room-id-display" data-page-node-id="LupuhvLH8vBB0nt1WBnBsV">房间号: <span id="display-room-id" data-page-node-id="K4m7tEuGF4CgwvNFoDnRCH"></span></div>
+                    <div class="room-chips-display" data-page-node-id="pZdCzGqoMBu5aCHW7IGgVZ">初始筹码: <span id="display-room-chips" data-page-node-id="6TikrOaMwJ1TPtCD9sa9Tc"></span></div>
+                    <div class="share-row" data-page-node-id="L7fs54i3qnf0pnzfq3ngHa">
+                        <div class="share-link-text" id="display-share-link" data-page-node-id="QuhZXaJNJFuYo2EsGvYDdB"></div>
+                        <button class="copy-btn" onclick="copyShareLink()" data-page-node-id="SD7zogw7VKsJ7cpknKmsQB">复制</button>
                     </div>
                 </div>
 
-                <p class="waiting-text">等待其他玩家加入...</p>
-                <div class="players-list" id="game-players-list"></div>
+                <p class="waiting-text" data-page-node-id="LNjxQwj4CZfLH2OLwvnRwX">等待其他玩家加入...</p>
+                <div class="players-list" id="game-players-list" data-page-node-id="4ruKHjTD9Ld2byFkvBykIS"></div>
 
-                <div class="action-buttons">
-                    <button type="button" class="btn btn-secondary ready-btn" id="ready-btn" onclick="toggleReady()">准备</button>
-                    <button type="button" class="btn btn-secondary" onclick="showRenameInput()">改名</button>
-                    <button type="button" class="btn btn-primary start-btn" id="start-btn" onclick="startGame()" style="display: none;">开始游戏</button>
+                <div class="action-buttons" data-page-node-id="ULCRlFrQIjU1ezA7h514NW">
+                    <button type="button" class="btn btn-secondary ready-btn" id="ready-btn" onclick="toggleReady()" data-page-node-id="77l30GjxghcoSB0WDN1b8r">准备</button>
+                    <button type="button" class="btn btn-secondary" onclick="showRenameInput()" data-page-node-id="V9nNSmz2C3aHKq0FYtGAEy">改名</button>
+                    <button type="button" class="btn btn-primary start-btn" id="start-btn" onclick="startGame()" style="display: none;" data-page-node-id="I9lDozLLd6Yb8siJ5A2NK0">开始游戏</button>
                 </div>
             </div>
 
             <!-- 游戏区域 -->
-            <div id="playing-area" style="display: none;">
-                <div class="game-layout">
-                    <div class="game-main">
-                        <div class="game-status" id="game-status">等待开始...</div>
+            <div id="playing-area" style="display: none;" data-page-node-id="Z9DeUUTMPFqhSlRjOJCXWh">
+                <div class="game-layout" data-page-node-id="HbqRw4GIH62KgdMXOT06Yp">
+                    <div class="game-main" data-page-node-id="PyQKHp8cQMNJvelYg2yakb">
+                        <div class="game-status" id="game-status" data-page-node-id="kPn3lpwVbEAsXXBmNnyg2v">等待开始...</div>
 
-                        <div class="game-table">
-                    <div class="table-layout">
+                        <div class="game-table" data-page-node-id="78NffTWytcN3ozD55srSOw">
+                    <div class="table-layout" data-page-node-id="eog9WPt7EhjTLi7VcfoNdA">
                         <!-- 上方玩家 -->
-                        <div class="seats-row top" id="seats-top"></div>
+                        <div class="seats-row top" id="seats-top" data-page-node-id="n4ombpVj9DFyOC7wKOwOFP"></div>
 
                         <!-- 公共牌区域 -->
-                        <div class="community-area">
-                            <div class="community-label">公共牌</div>
-                            <div class="community-cards" id="community-cards">
-                                <div class="card face-down hidden"></div>
-                                <div class="card face-down hidden"></div>
-                                <div class="card face-down hidden"></div>
-                                <div class="card face-down hidden"></div>
-                                <div class="card face-down hidden"></div>
+                        <div class="community-area" data-page-node-id="aGoktQ6QqaDEViqNrocwCw">
+                            <div class="community-label" data-page-node-id="elomDWbJh2QxPcpzAgqW8f">公共牌</div>
+                            <div class="community-cards" id="community-cards" data-page-node-id="H0y95TkwRwfJp7E1vLCWoX">
+                                <div class="card face-down hidden" data-page-node-id="EUy8mZ227HQYHBiUZ5FqNo"></div>
+                                <div class="card face-down hidden" data-page-node-id="88q4TuLRpxVmADcBFlY5fk"></div>
+                                <div class="card face-down hidden" data-page-node-id="eRQ3pXsAUH3GrigzU868zw"></div>
+                                <div class="card face-down hidden" data-page-node-id="ZgBKBUZYgR8Q8PLp9gZnrW"></div>
+                                <div class="card face-down hidden" data-page-node-id="BmKRSnNG8t3VR7NToZMANa"></div>
                             </div>
                         </div>
 
                         <!-- 底池 -->
-                        <div class="pot-area">
-                            <span class="pot-label">底池:</span>
-                            <span class="pot-amount" id="pot-amount">0</span>
+                        <div class="pot-area" data-page-node-id="IYaeaAICnUU75p2s5cjZmA">
+                            <span class="pot-label" data-page-node-id="FVFGRzKyqDQrIjQUvxhoyX">底池:</span>
+                            <span class="pot-amount" id="pot-amount" data-page-node-id="WUALZZ5AOA1w5H8RXhpZYd">0</span>
                         </div>
 
                         <!-- 下方玩家 -->
-                        <div class="seats-row bottom" id="seats-bottom"></div>
+                        <div class="seats-row bottom" id="seats-bottom" data-page-node-id="DW0uzqp5ZOYt2d4W6tK6Qg"></div>
                     </div>
                 </div>
 
                 <!-- 操作区域 -->
-                <div class="player-hand-area" id="player-hand-area">
-                    <div class="info-panel">
-                        <div class="info-item">
-                            <span class="label">当前下注:</span>
-                            <span class="value" id="current-bet">0</span>
+                <div class="player-hand-area" id="player-hand-area" data-page-node-id="7P6YTO6ytbZ0DCGkhXyqV9">
+                    <div class="info-panel" data-page-node-id="AQhci0wx7KswjoDaP3vEQG">
+                        <div class="info-item" data-page-node-id="JU3EnbhCfxHAHcjhx70TNV">
+                            <span class="label" data-page-node-id="nY11IsksQpdISZDf3qNAxB">当前下注:</span>
+                            <span class="value" id="current-bet" data-page-node-id="CbcomTCKgwGlj70Mxe8i8h">0</span>
                         </div>
-                        <div class="info-item">
-                            <span class="label">需跟注:</span>
-                            <span class="value" id="to-call">0</span>
+                        <div class="info-item" data-page-node-id="Xws4YbF9uJlybvBZx2ylf1">
+                            <span class="label" data-page-node-id="WnOvA7oBelveH5s5D5Vcxf">需跟注:</span>
+                            <span class="value" id="to-call" data-page-node-id="JPhj3UNpw18asCpzjRSQD7">0</span>
                         </div>
-                        <div class="info-item timer-item">
-                            <span class="label">剩余时间:</span>
-                            <span class="value timer-value" id="action-timer">30s</span>
+                        <div class="info-item timer-item" data-page-node-id="Na0CJN287HP6hH1Fq76LKO">
+                            <span class="label" data-page-node-id="CwQx5V9BzMukpxRX1VOQ0w">剩余时间:</span>
+                            <span class="value timer-value" id="action-timer" data-page-node-id="nl4HfrK2RVIIX1e4x16oQU">30s</span>
                         </div>
                     </div>
 
-                    <div class="action-area" id="action-area">
-                        <button class="action-btn fold" onclick="playerAction('fold')">弃牌</button>
-                        <button class="action-btn check" id="check-btn" onclick="playerAction('check')" style="display:none">过牌</button>
-                        <button class="action-btn call" id="call-btn" onclick="playerAction('call')" style="display:none">跟注</button>
-                        <button class="action-btn bet" id="bet-btn" onclick="playerAction('bet')">下注</button>
-                        <div class="bet-controls">
-                            <input type="number" class="bet-input" id="bet-amount" min="10" step="10" placeholder="金额(10的倍数)">
+                    <div class="action-area" id="action-area" data-page-node-id="1SZ1BUmQfyetBwjd7NLXcC">
+                        <button class="action-btn fold" onclick="playerAction('fold')" data-page-node-id="WQi15w9HOdxKqNfuemstpb">弃牌</button>
+                        <button class="action-btn check" id="check-btn" onclick="playerAction('check')" style="display:none" data-page-node-id="xFp63kgXPE78ArPXtuhvOs">过牌</button>
+                        <button class="action-btn call" id="call-btn" onclick="playerAction('call')" style="display:none" data-page-node-id="DGvM9NzQacBwIN3r24Ftcn">跟注</button>
+                        <button class="action-btn bet" id="bet-btn" onclick="playerAction('bet')" data-page-node-id="VZRWbhouxcEOQTzD9Ml5Lj">下注</button>
+                        <div class="bet-controls" data-page-node-id="sFrhnvHFPIg5F9l0iPHm5J">
+                            <input type="number" class="bet-input" id="bet-amount" min="10" max="2000" step="10" placeholder="金额" data-page-node-id="nCYZaByWtIdrHnRBVF759t">
+                            <span class="bet-hint" id="bet-hint" data-page-node-id="xO0hp0ZBYRAWCcCMxqsDoZ"></span>
                         </div>
-                        <button class="action-btn raise" id="raise-btn" onclick="playerAction('raise')" style="display:none">加注</button>
-                        <button class="action-btn all-in" onclick="playerAction('allin')">全下</button>
+                        <button class="action-btn raise" id="raise-btn" onclick="playerAction('raise')" style="display:none" data-page-node-id="2XFGUV8obnCNe5n9yvnFQs">加注</button>
+                        <button class="action-btn all-in" onclick="playerAction('allin')" data-page-node-id="KgSzBfPPybZsWjOGAyKJrE">全下</button>
                     </div>
                 </div>
                 <!-- /player-hand-area -->
@@ -835,22 +846,22 @@
                     <!-- /game-main -->
 
                     <!-- 右侧行动日志 -->
-                <div class="action-log" id="action-log">
-                    <div class="action-log-title">行动记录</div>
-                    <div class="action-log-list" id="action-log-list">
-                        <div class="action-log-empty">等待行动...</div>
+                <div class="action-log" id="action-log" data-page-node-id="VdlcaGXhyTglja1iErMwb4">
+                    <div class="action-log-title" data-page-node-id="3eDGeYn3isj8iUqmSusGf0">行动记录</div>
+                    <div class="action-log-list" id="action-log-list" data-page-node-id="Ji3kdwdxEnbAXNBDyd7t4S">
+                        <div class="action-log-empty" data-page-node-id="ml7XVfvxxeW1prrwnCVKwD">等待行动...</div>
                     </div>
                 </div>
 
                 <!-- 聊天框 -->
-                <div class="chat-box" id="chat-box">
-                    <div class="chat-title">聊天</div>
-                    <div class="chat-messages" id="chat-messages">
-                        <div class="chat-empty">暂无消息</div>
+                <div class="chat-box" id="chat-box" data-page-node-id="1JyOYopszSL3kNDw1C1K8V">
+                    <div class="chat-title" data-page-node-id="ePGGpZtcfjQOZtSN4S6EYB">聊天</div>
+                    <div class="chat-messages" id="chat-messages" data-page-node-id="vgMSoVnKD9k1lEgFnwqjP8">
+                        <div class="chat-empty" data-page-node-id="biECxLYQgyEoTOSTe8csWh">暂无消息</div>
                     </div>
-                    <div class="chat-input-row">
-                        <input type="text" class="chat-input" id="chat-input" placeholder="输入消息..." maxlength="100" onkeydown="if(event.key==='Enter')sendChat()">
-                        <button class="chat-send-btn" onclick="sendChat()">发送</button>
+                    <div class="chat-input-row" data-page-node-id="6EDqxsdjfAHbvd55n71buJ">
+                        <input type="text" class="chat-input" id="chat-input" placeholder="输入消息..." maxlength="100" onkeydown="if(event.key==='Enter')sendChat()" data-page-node-id="ywhLaud7iuPct1dIkBJG6f">
+                        <button class="chat-send-btn" onclick="sendChat()" data-page-node-id="ZZD34AoIHsrHpMiMBy2tzB">发送</button>
                     </div>
                 </div>
                 </div>
@@ -886,6 +897,18 @@
             currentBet: 0,
             actionLog: []
         };
+
+        // 下注输入框变化时实时刷新按钮可用性与提示（不依赖服务端往返）
+        (function bindBetInputListener() {
+            const input = document.getElementById('bet-amount');
+            if (!input) return;
+            const refresh = () => {
+                const latest = window.currentGameData;
+                if (latest) enableActions(latest);
+            };
+            input.addEventListener('input', refresh);
+            input.addEventListener('change', refresh);
+        })();
 
         let selectedChips = 2000;
 
@@ -1141,24 +1164,101 @@
         }
 
         // ============ 下注功能 ============
-        function playerAction(action) {
+        /**
+         * 客户端侧的合法性校验，规则与服务端 validateBetAction 保持一致。
+         * 返回 { valid, error, normalizedAmount, action }
+         * 注意：服务端仍会重新校验一次，这里只是为了即时反馈、避免无谓的请求。
+         */
+        function validateMyAction(action, amount) {
             const data = window.currentGameData || {};
-            const input = document.getElementById('bet-amount');
-            const amount = parseInt(input.value) || 0;
+            const me = game.players.find(p => p.id === game.playerId);
+            const myChips = Math.max(0, (me && me.chips) || 0);
+            const myBet = Math.max(0, (me && me.currentBet) || 0);
+            const tableBet = Math.max(0, data.currentBet || 0);
+            const minRaise = Math.max(0, data.minRaise !== undefined ? data.minRaise : (data.bigBlind || 20));
 
-            // 下注/加注金额必须是10的倍数
-            if ((action === 'bet' || action === 'raise') && (amount <= 0 || amount % 10 !== 0)) {
-                alert('下注金额必须是10的倍数');
+            const toCall = tableBet - myBet;
+            const minTarget = tableBet + minRaise;  // 合法加注后的最低「总注额」
+            const maxTarget = myBet + myChips;      // 打光全部筹码能到的总注额
+
+            const ok = (normalizedAmount, finalAction) =>
+                ({ valid: true, normalizedAmount: normalizedAmount, action: finalAction || action });
+
+            switch (action) {
+                case 'fold':
+                    return ok(0);
+
+                case 'check':
+                    if (toCall > 0) {
+                        const affordable = Math.min(toCall, myChips);
+                        return {
+                            valid: false,
+                            error: `当前有下注，不能过牌（需跟注 ${affordable}${affordable < toCall ? '，筹码不足将全下' : ''}）`
+                        };
+                    }
+                    return ok(0);
+
+                case 'call':
+                    if (toCall <= 0) return ok(0, 'check');   // 归一化为过牌
+                    if (toCall >= myChips) return ok(myChips, 'allin');
+                    return ok(toCall);
+
+                case 'bet':
+                case 'raise': {
+                    if (!Number.isFinite(amount) || amount <= 0) {
+                        return { valid: false, error: '请输入大于 0 的下注金额' };
+                    }
+                    if (myChips <= 0) {
+                        return { valid: false, error: '没有筹码可以下注' };
+                    }
+                    const requestedTarget = myBet + amount;
+                    const target = Math.min(requestedTarget, maxTarget);
+                    const isAllIn = requestedTarget >= maxTarget;
+                    const isFullRaise = target >= minTarget;
+                    if (!isFullRaise && !isAllIn) {
+                        return {
+                            valid: false,
+                            error: `最小加注到 ${minTarget}（当前注额 ${tableBet}，最小加注增量 ${minRaise}）`
+                        };
+                    }
+                    return ok(Math.max(0, target - myBet), isAllIn ? 'allin' : action);
+                }
+
+                case 'allin':
+                    if (myChips <= 0) return { valid: false, error: '没有筹码可以下注' };
+                    return ok(myChips);
+
+                default:
+                    return { valid: false, error: '未知操作' };
+            }
+        }
+
+        function playerAction(action) {
+            const input = document.getElementById('bet-amount');
+            const raw = input ? parseInt(input.value, 10) : NaN;
+            const amount = Number.isFinite(raw) ? raw : NaN;
+
+            // 与服务端相同的规则做一次前置校验，非法时直接提示，不发请求
+            const check = validateMyAction(action, (action === 'bet' || action === 'raise') ? amount : 0);
+            if (!check.valid) {
+                alert(check.error || '操作非法');
                 return;
             }
 
-            console.log('[playerAction]', action, 'socket.connected:', socket.connected, 'socket.id:', socket.id);
+            console.log('[playerAction]', check.action, 'amount:', check.normalizedAmount,
+                '| socket.connected:', socket.connected, 'socket.id:', socket.id);
 
-            socket.emit('bet', { action, amount }, (response) => {
+            socket.emit('bet', { action, amount: check.normalizedAmount }, (response) => {
                 console.log('[playerAction] response:', response);
                 if (!response.success) {
                     alert(response.error || '操作失败');
+                } else {
+                    // 成功后清空输入框，等待下一次 gameUpdate 刷新范围
+                    if (input) input.value = '';
                 }
+                // 操作后立刻按最新状态刷新按钮可用性
+                const latest = window.currentGameData;
+                if (latest) enableActions(latest);
             });
         }
 
@@ -1310,12 +1410,13 @@
         function closeNewHandModal() {
             document.getElementById('new-hand-modal').style.display = 'none';
             // 使用 game 对象的最新状态重新计算，避免 window.currentGameData 被旧数据污染
-            const data = {
+            const data = Object.assign({}, window.currentGameData || {}, {
                 currentBet: game.currentBet || 0,
+                minRaise: game.minRaise || 0,
                 phase: game.phase,
                 currentPlayer: game.currentPlayer,
                 players: game.players
-            };
+            });
             enableActions(data);
         }
 
@@ -1469,6 +1570,10 @@
             game.phase = data.phase;
             game.dealer = data.dealer !== undefined ? data.dealer : game.dealer;
             if (data.currentBet !== undefined) game.currentBet = data.currentBet;
+            // 最小加注增量（服务端下发的下注规则），缺省时回退到大盲
+            game.minRaise = data.minRaise !== undefined
+                ? data.minRaise
+                : (data.bigBlind !== undefined ? data.bigBlind : (game.minRaise || 20));
 
             console.log('[updateGameState] dealer:', data.dealer, 'dealerIdx will be:', data.dealer, 'phase:', data.phase);
 
@@ -1713,6 +1818,14 @@
             const toCall = dataCurrentBet - playerCurrentBet;
             console.log(`[enableActions] toCall计算: data.currentBet=${data.currentBet}(${typeof data.currentBet}) - player.currentBet=${player.currentBet}(${typeof player.currentBet}) = ${toCall}`);
 
+            // 下注规则：tableBet + minRaise 是「加注到的最低总注额」
+            const tableBet = Math.max(0, dataCurrentBet);
+            const minRaise = Math.max(0, (data.minRaise !== undefined ? data.minRaise : (data.bigBlind || 20)));
+            const minTarget = tableBet + minRaise;                       // 加注后的最低总注额
+            const myChips = Math.max(0, player.chips || 0);
+            const minIncrement = Math.max(0, minTarget - playerCurrentBet); // 输入框下限：至少还要投入多少
+            const maxIncrement = myChips;                                   // 输入框上限：自己的剩余筹码
+
             document.getElementById('current-bet').textContent = playerCurrentBet;
             document.getElementById('to-call').textContent = toCall;
 
@@ -1722,21 +1835,61 @@
             // 如果对手已all-in且筹码比你少，你只能跟注
             const cantRaiseAllin = opponentAllIn && toCall >= game.myChips;
 
+            // 下注额只能落在 [minIncrement, maxIncrement] 之间
+            if (betInput) {
+                betInput.min = minIncrement;
+                betInput.max = maxIncrement;
+                betInput.dataset.minTarget = minTarget;
+                if (betInput.value === '' || parseInt(betInput.value, 10) < minIncrement) {
+                    betInput.value = Math.min(minIncrement, maxIncrement);
+                }
+            }
+
+            // 无注可跟 → 过牌 / 下注；有注要跟 → 跟注 / 加注
             if (toCall <= 0) {
                 checkBtn.style.display = 'block';
                 betBtn.style.display = 'block';
-                raiseBtn.style.display = 'block';
             } else {
                 callBtn.style.display = 'block';
-                callBtn.textContent = toCall >= game.myChips ? '全下' : `跟注 ${toCall}`;
-                if (game.myChips > toCall && !opponentAllIn) {
-                    raiseBtn.style.display = 'block';
-                    betBtn.style.display = 'block';
-                }
+                callBtn.textContent = toCall >= myChips ? '全下' : `跟注 ${Math.min(toCall, myChips)}`;
+                // 只有还有筹码可以「加注到最低注额以上」时才显示加注
+                raiseBtn.style.display = 'block';
             }
             // 全下按钮：只有当没有被对手all-in限制时才显示
             if (!opponentAllIn || toCall >= game.myChips) {
                 if (allinBtn) allinBtn.style.display = 'block';
+            }
+
+            // ---------- 依据当前输入值实时校验，非法则置灰下注/加注按钮并说明原因 ----------
+            const betValue = betInput ? parseInt(betInput.value, 10) : NaN;
+            const candidate = Number.isFinite(betValue) ? betValue : 0;
+            const betCheck = validateMyAction('bet', candidate);
+            const canAggress = betCheck.valid;
+            const raiseCheck = validateMyAction('raise', candidate);
+
+            betBtn.disabled = !betCheck.valid;
+            raiseBtn.disabled = !raiseCheck.valid;
+            betBtn.title = betCheck.valid ? '' : betCheck.error;
+            raiseBtn.title = raiseCheck.valid ? '' : raiseCheck.error;
+            if (betInput) betInput.disabled = !canAggress && myChips <= 0;
+
+            const hint = document.getElementById('bet-hint');
+            if (hint) {
+                hint.classList.remove('invalid', 'valid');
+                if (myChips <= 0) {
+                    hint.textContent = '筹码已打光';
+                    hint.classList.add('invalid');
+                } else if (minIncrement > maxIncrement) {
+                    // 连最小加注都够不上 —— 只能跟注或全下
+                    hint.textContent = `加注需 ${minIncrement}，超出剩余筹码 ${maxIncrement}，只能跟注 / 全下`;
+                    hint.classList.add('invalid');
+                } else if (!betCheck.valid) {
+                    hint.textContent = betCheck.error || '下注金额不合法';
+                    hint.classList.add('invalid');
+                } else {
+                    hint.textContent = `可下 ${minIncrement} ~ ${maxIncrement}（加注到 ${minTarget}+）`;
+                    hint.classList.add('valid');
+                }
             }
         }
 
